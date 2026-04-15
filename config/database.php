@@ -99,6 +99,16 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | Dynamic remote connections
+        |--------------------------------------------------------------------------
+        |
+        | Additional connections are registered at boot from the database_connections
+        | table (see App\Services\DatabaseConnectionRegistrar).
+        |
+        */
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),
