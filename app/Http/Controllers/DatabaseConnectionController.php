@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DatabaseDriver;
 use App\Http\Requests\StoreDatabaseConnectionRequest;
 use App\Http\Requests\UpdateDatabaseConnectionRequest;
 use App\Models\DatabaseConnection;
@@ -9,13 +10,79 @@ use App\Models\DatabaseConnectionLog;
 use App\Services\DatabaseConnectionChangeLogger;
 use App\Services\DatabaseConnectionRegistrar;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rules\Enum;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class DatabaseConnectionController extends Controller
 {
     use AuthorizesRequests;
+
+    public function testConnection(Request $request): JsonResponse
+    {
+        $this->authorize('create', DatabaseConnection::class);
+
+        $validated = $request->validate([
+            'driver' => ['required', new Enum(DatabaseDriver::class)],
+            'access_mode' => ['required', 'string'],
+            'url' => ['nullable', 'string', 'max:2048'],
+            'host' => ['nullable', 'string', 'max:255'],
+            'port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'database' => ['nullable', 'string', 'max:255'],
+            'username' => ['nullable', 'string', 'max:255'],
+            'password' => ['nullable', 'string', 'max:5000'],
+            'unix_socket' => ['nullable', 'string', 'max:255'],
+            'charset' => ['nullable', 'string', 'max:64'],
+            'collation' => ['nullable', 'string', 'max:64'],
+            'search_path' => ['nullable', 'string', 'max:255'],
+            'sslmode' => ['nullable', 'string', 'max:32'],
+            'ssl_ca_path' => ['nullable', 'string', 'max:2048'],
+            'mongodb_dsn' => ['nullable', 'string', 'max:2048'],
+            'mongodb_authentication_database' => ['nullable', 'string', 'max:255'],
+            'mongodb_read_preference' => ['nullable', 'string', 'max:64'],
+            'connection_id' => ['nullable', 'integer', 'exists:database_connections,id'],
+        ]);
+
+        // Build a transient model — never saved.
+        $tempModel = new DatabaseConnection;
+        $tempModel->fill($validated);
+
+        // When testing an existing connection, restore stored password if left blank.
+        if (! empty($validated['connection_id'])) {
+            $existing = DatabaseConnection::find($validated['connection_id']);
+
+            if ($existing instanceof DatabaseConnection && empty($validated['password'])) {
+                $tempModel->password = $existing->password;
+            }
+        }
+
+        $config = DatabaseConnectionRegistrar::toLaravelConnection($tempModel);
+        $tempKey = 'db_test_'.uniqid();
+        Config::set("database.connections.{$tempKey}", $config);
+
+        try {
+            $connection = DB::connection($tempKey);
+
+            match ($tempModel->driver) {
+                DatabaseDriver::Mysql, DatabaseDriver::Pgsql => $connection->getPdo(),
+                DatabaseDriver::Mongodb => iterator_to_array(
+                    $connection->getMongoDB()->listCollections(['nameOnly' => true])
+                ),
+            };
+
+            return response()->json(['success' => true, 'message' => 'Connection successful.']);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
+        } finally {
+            DB::purge($tempKey);
+        }
+    }
 
     public function index(): Response
     {
@@ -91,6 +158,8 @@ class DatabaseConnectionController extends Controller
         $before = DatabaseConnectionChangeLogger::snapshot($databaseConnection);
 
         $validated = $request->validated();
+
+        // Password: blank means keep existing.
         $password = $validated['password'] ?? null;
         unset($validated['password']);
 
@@ -140,9 +209,6 @@ class DatabaseConnectionController extends Controller
             'mongodb_dsn' => $databaseConnection->mongodb_dsn,
             'mongodb_authentication_database' => $databaseConnection->mongodb_authentication_database,
             'mongodb_read_preference' => $databaseConnection->mongodb_read_preference,
-            'ssh_tunnel' => $databaseConnection->ssh_tunnel
-                ? (string) json_encode($databaseConnection->ssh_tunnel, JSON_PRETTY_PRINT)
-                : '',
             'extra_options' => $databaseConnection->extra_options
                 ? (string) json_encode($databaseConnection->extra_options, JSON_PRETTY_PRINT)
                 : '',

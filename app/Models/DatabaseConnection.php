@@ -34,7 +34,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'mongodb_dsn',
     'mongodb_authentication_database',
     'mongodb_read_preference',
-    'ssh_tunnel',
     'extra_options',
 ])]
 class DatabaseConnection extends Model
@@ -54,7 +53,6 @@ class DatabaseConnection extends Model
             'writes_enabled' => 'boolean',
             'enforce_read_only_sql_guard' => 'boolean',
             'password' => 'encrypted',
-            'ssh_tunnel' => 'array',
             'extra_options' => 'array',
         ];
     }

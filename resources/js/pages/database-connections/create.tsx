@@ -29,7 +29,6 @@ const defaults = {
     mongodb_dsn: '',
     mongodb_authentication_database: 'admin',
     mongodb_read_preference: '',
-    ssh_tunnel: '',
     extra_options: '',
 };
 

@@ -82,11 +82,14 @@ final class DatabaseConnectionRegistrar
             $options = array_replace($options, $c->extra_options['pdo']);
         }
 
+        $host = $c->host ?: '127.0.0.1';
+        $port = $c->port ?: 3306;
+
         return [
             'driver' => 'mysql',
             'url' => $c->url,
-            'host' => $c->host ?? '127.0.0.1',
-            'port' => $c->port ?? 3306,
+            'host' => $host,
+            'port' => $port,
             'database' => $c->database ?? '',
             'username' => $c->username ?? '',
             'password' => $c->password ?? '',
@@ -106,11 +109,14 @@ final class DatabaseConnectionRegistrar
      */
     private static function pgsql(DatabaseConnection $c): array
     {
+        $host = $c->host ?: '127.0.0.1';
+        $port = $c->port ?: 5432;
+
         return [
             'driver' => 'pgsql',
             'url' => $c->url,
-            'host' => $c->host ?? '127.0.0.1',
-            'port' => $c->port ?? 5432,
+            'host' => $host,
+            'port' => $port,
             'database' => $c->database ?? '',
             'username' => $c->username ?? '',
             'password' => $c->password ?? '',
@@ -140,11 +146,14 @@ final class DatabaseConnectionRegistrar
             $options = array_replace($options, $c->extra_options['mongo']);
         }
 
+        $host = $c->host ?: '127.0.0.1';
+        $port = $c->port ?: 27017;
+
         return [
             'driver' => 'mongodb',
             'dsn' => $c->mongodb_dsn,
-            'host' => $c->host ?? '127.0.0.1',
-            'port' => $c->port ?? 27017,
+            'host' => $host,
+            'port' => $port,
             'database' => $c->database ?? '',
             'username' => $c->username,
             'password' => $c->password,

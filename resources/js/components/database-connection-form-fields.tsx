@@ -1,5 +1,7 @@
+import { useRef, useState } from 'react';
+import { testConnection } from '@/actions/App/Http/Controllers/DatabaseConnectionController';
 import InputError from '@/components/input-error';
-import Heading from '@/components/heading';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -28,9 +30,13 @@ export type DatabaseConnectionFormDefaults = {
     mongodb_dsn: string;
     mongodb_authentication_database: string;
     mongodb_read_preference: string;
-    ssh_tunnel: string;
     extra_options: string;
 };
+
+const selectClass = cn(
+    'border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none',
+    'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+);
 
 function BooleanField({
     name,
@@ -44,154 +50,232 @@ function BooleanField({
     error?: string;
 }) {
     return (
-        <div className="grid gap-2">
-            <div className="flex items-center gap-2">
-                <input type="hidden" name={name} value="0" />
-                <input
-                    type="checkbox"
-                    name={name}
-                    value="1"
-                    defaultChecked={defaultChecked}
-                    id={name}
-                    className="border-input text-primary focus-visible:ring-ring/50 size-4 rounded border shadow-xs outline-none focus-visible:ring-[3px]"
-                />
-                <Label htmlFor={name} className="font-normal">
-                    {label}
-                </Label>
-            </div>
+        <div className="flex items-center gap-2">
+            <input type="hidden" name={name} value="0" />
+            <input
+                type="checkbox"
+                name={name}
+                value="1"
+                defaultChecked={defaultChecked}
+                id={name}
+                className="border-input text-primary focus-visible:ring-ring/50 size-4 rounded border shadow-xs outline-none focus-visible:ring-[3px]"
+            />
+            <Label htmlFor={name} className="font-normal">
+                {label}
+            </Label>
             <InputError message={error} />
         </div>
     );
+}
+
+type TestResult = { success: boolean; message: string };
+
+function getXsrfToken(): string {
+    const entry = document.cookie.split('; ').find((row) => row.startsWith('XSRF-TOKEN='));
+    return entry ? decodeURIComponent(entry.split('=')[1]) : '';
 }
 
 export default function DatabaseConnectionFormFields({
     defaults,
     errors,
     passwordMode,
+    connectionId,
 }: {
     defaults: DatabaseConnectionFormDefaults;
     errors: Partial<Record<string, string>>;
     passwordMode: 'required' | 'optional';
+    connectionId?: number;
 }) {
+    const [driver, setDriver] = useState(defaults.driver || 'mysql');
+    const [testing, setTesting] = useState(false);
+    const [testResult, setTestResult] = useState<TestResult | null>(null);
+    const testButtonRef = useRef<HTMLButtonElement>(null);
+
+    const hasAdvancedErrors = !!(
+        errors.url ||
+        errors.unix_socket ||
+        errors.charset ||
+        errors.collation ||
+        errors.search_path ||
+        errors.ssl_ca_path ||
+        errors.mongodb_read_preference ||
+        errors.extra_options ||
+        errors.is_active ||
+        errors.writes_enabled ||
+        errors.enforce_read_only_sql_guard
+    );
+
+    async function handleTest() {
+        const form = testButtonRef.current?.closest('form') as HTMLFormElement | null;
+        if (!form) return;
+
+        setTesting(true);
+        setTestResult(null);
+
+        const formData = new FormData(form);
+        if (connectionId !== undefined) {
+            formData.append('connection_id', String(connectionId));
+        }
+
+        try {
+            const response = await fetch(testConnection.url(), {
+                method: 'POST',
+                headers: {
+                    'X-XSRF-TOKEN': getXsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    Accept: 'application/json',
+                },
+                body: formData,
+            });
+            const result = (await response.json()) as TestResult;
+            setTestResult(result);
+        } catch {
+            setTestResult({ success: false, message: 'Request failed. Check your network.' });
+        } finally {
+            setTesting(false);
+        }
+    }
+
     return (
-        <div className="space-y-10">
-            <div className="space-y-4">
-                <Heading
-                    variant="small"
-                    title="Identity"
-                    description="Slug is the Laravel connection name (letters, numbers, hyphen, underscore)."
-                />
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="grid gap-2 sm:col-span-2">
-                        <Label htmlFor="slug">Slug</Label>
-                        <Input
-                            id="slug"
-                            name="slug"
-                            required
-                            defaultValue={defaults.slug}
-                            placeholder="warehouse_read"
-                            autoComplete="off"
-                        />
-                        <InputError message={errors.slug} />
-                    </div>
-                    <div className="grid gap-2 sm:col-span-2">
-                        <Label htmlFor="connection_group">Connection group</Label>
-                        <Input
-                            id="connection_group"
-                            name="connection_group"
-                            required
-                            defaultValue={defaults.connection_group}
-                            placeholder="warehouse"
-                            autoComplete="off"
-                        />
-                        <InputError message={errors.connection_group} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="driver">Driver</Label>
-                        <select
-                            id="driver"
-                            name="driver"
-                            required
-                            defaultValue={defaults.driver}
-                            className={cn(
-                                'border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none',
-                                'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-                            )}
-                        >
-                            <option value="mysql">MySQL</option>
-                            <option value="pgsql">PostgreSQL</option>
-                            <option value="mongodb">MongoDB</option>
-                        </select>
-                        <InputError message={errors.driver} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="access_mode">Access mode</Label>
-                        <select
-                            id="access_mode"
-                            name="access_mode"
-                            required
-                            defaultValue={defaults.access_mode}
-                            className={cn(
-                                'border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none',
-                                'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-                            )}
-                        >
-                            <option value="read">Read</option>
-                            <option value="write">Write</option>
-                        </select>
-                        <InputError message={errors.access_mode} />
-                    </div>
-                    <div className="grid gap-2 sm:col-span-2">
-                        <Label htmlFor="label">Label (optional)</Label>
-                        <Input
-                            id="label"
-                            name="label"
-                            defaultValue={defaults.label}
-                            placeholder="Warehouse reporting (read replica)"
-                        />
-                        <InputError message={errors.label} />
-                    </div>
+        <div className="space-y-6">
+            {/* Database type + access mode */}
+            <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                    <Label htmlFor="driver">Database</Label>
+                    <select
+                        id="driver"
+                        name="driver"
+                        value={driver}
+                        onChange={(e) => setDriver(e.target.value)}
+                        className={selectClass}
+                    >
+                        <option value="mysql">MySQL</option>
+                        <option value="pgsql">PostgreSQL</option>
+                        <option value="mongodb">MongoDB</option>
+                    </select>
+                    <InputError message={errors.driver} />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <BooleanField
-                        name="is_active"
-                        label="Active (register on boot)"
-                        defaultChecked={defaults.is_active}
-                        error={errors.is_active}
-                    />
-                    <BooleanField
-                        name="writes_enabled"
-                        label="Writes enabled (write rows only)"
-                        defaultChecked={defaults.writes_enabled}
-                        error={errors.writes_enabled}
-                    />
-                    <BooleanField
-                        name="enforce_read_only_sql_guard"
-                        label="SQL read-only guard (read rows)"
-                        defaultChecked={defaults.enforce_read_only_sql_guard}
-                        error={errors.enforce_read_only_sql_guard}
-                    />
+                <div className="grid gap-2">
+                    <Label htmlFor="access_mode">Connection type</Label>
+                    <select
+                        id="access_mode"
+                        name="access_mode"
+                        defaultValue={defaults.access_mode}
+                        className={selectClass}
+                    >
+                        <option value="read">Read</option>
+                        <option value="write">Write</option>
+                    </select>
+                    <InputError message={errors.access_mode} />
                 </div>
             </div>
 
-            <div className="space-y-4">
-                <Heading
-                    variant="small"
-                    title="Credentials"
-                    description="Use read-only database users for read connections when possible."
-                />
+            {/* Identity */}
+            <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                    <Label htmlFor="slug">Slug</Label>
+                    <Input
+                        id="slug"
+                        name="slug"
+                        required
+                        defaultValue={defaults.slug}
+                        placeholder="warehouse_read"
+                        autoComplete="off"
+                    />
+                    <InputError message={errors.slug} />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="connection_group">Group</Label>
+                    <Input
+                        id="connection_group"
+                        name="connection_group"
+                        required
+                        defaultValue={defaults.connection_group}
+                        placeholder="warehouse"
+                        autoComplete="off"
+                    />
+                    <InputError message={errors.connection_group} />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                    <Label htmlFor="label">
+                        Label{' '}
+                        <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Input
+                        id="label"
+                        name="label"
+                        defaultValue={defaults.label}
+                        placeholder="Production read replica"
+                    />
+                    <InputError message={errors.label} />
+                </div>
+            </div>
+
+            {/* Credentials — driver aware */}
+            {driver === 'mongodb' ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2 sm:col-span-2">
-                        <Label htmlFor="url">URL (optional)</Label>
+                        <Label htmlFor="mongodb_dsn">
+                            Connection DSN{' '}
+                            <span className="text-muted-foreground font-normal">(optional)</span>
+                        </Label>
                         <Input
-                            id="url"
-                            name="url"
-                            defaultValue={defaults.url}
-                            placeholder="mysql://user:pass@host:3306/db"
+                            id="mongodb_dsn"
+                            name="mongodb_dsn"
+                            defaultValue={defaults.mongodb_dsn}
+                            placeholder="mongodb://user:pass@host:27017/dbname"
                             autoComplete="off"
                         />
-                        <InputError message={errors.url} />
+                        <InputError message={errors.mongodb_dsn} />
                     </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="database">Database name</Label>
+                        <Input id="database" name="database" defaultValue={defaults.database} />
+                        <InputError message={errors.database} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="mongodb_authentication_database">Auth database</Label>
+                        <Input
+                            id="mongodb_authentication_database"
+                            name="mongodb_authentication_database"
+                            defaultValue={defaults.mongodb_authentication_database}
+                            placeholder="admin"
+                        />
+                        <InputError message={errors.mongodb_authentication_database} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="username">Username</Label>
+                        <Input
+                            id="username"
+                            name="username"
+                            defaultValue={defaults.username}
+                            autoComplete="off"
+                        />
+                        <InputError message={errors.username} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="password">
+                            Password
+                            {passwordMode === 'optional' && (
+                                <span className="text-muted-foreground font-normal">
+                                    {' '}
+                                    — leave blank to keep
+                                </span>
+                            )}
+                        </Label>
+                        <Input
+                            id="password"
+                            name="password"
+                            type="password"
+                            required={passwordMode === 'required'}
+                            defaultValue={defaults.password ?? ''}
+                            autoComplete="new-password"
+                        />
+                        <InputError message={errors.password} />
+                    </div>
+                </div>
+            ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2">
                         <Label htmlFor="host">Host</Label>
                         <Input
@@ -215,17 +299,13 @@ export default function DatabaseConnectionFormFields({
                                     ? undefined
                                     : defaults.port
                             }
-                            placeholder="3306"
+                            placeholder={driver === 'pgsql' ? '5432' : '3306'}
                         />
                         <InputError message={errors.port} />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="database">Database name</Label>
-                        <Input
-                            id="database"
-                            name="database"
-                            defaultValue={defaults.database}
-                        />
+                        <Input id="database" name="database" defaultValue={defaults.database} />
                         <InputError message={errors.database} />
                     </div>
                     <div className="grid gap-2">
@@ -244,7 +324,7 @@ export default function DatabaseConnectionFormFields({
                             {passwordMode === 'optional' && (
                                 <span className="text-muted-foreground font-normal">
                                     {' '}
-                                    — leave blank to keep current
+                                    — leave blank to keep
                                 </span>
                             )}
                         </Label>
@@ -258,150 +338,195 @@ export default function DatabaseConnectionFormFields({
                         />
                         <InputError message={errors.password} />
                     </div>
-                    <div className="grid gap-2 sm:col-span-2">
-                        <Label htmlFor="unix_socket">Unix socket (MySQL)</Label>
-                        <Input
-                            id="unix_socket"
-                            name="unix_socket"
-                            defaultValue={defaults.unix_socket}
-                        />
-                        <InputError message={errors.unix_socket} />
-                    </div>
+                    {driver === 'pgsql' && (
+                        <>
+                            <div className="grid gap-2">
+                                <Label htmlFor="sslmode">SSL mode</Label>
+                                <Input
+                                    id="sslmode"
+                                    name="sslmode"
+                                    defaultValue={defaults.sslmode}
+                                    placeholder="prefer"
+                                />
+                                <InputError message={errors.sslmode} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="search_path">Search path</Label>
+                                <Input
+                                    id="search_path"
+                                    name="search_path"
+                                    defaultValue={defaults.search_path}
+                                    placeholder="public"
+                                />
+                                <InputError message={errors.search_path} />
+                            </div>
+                        </>
+                    )}
                 </div>
+            )}
+
+            {/* Test connection */}
+            <div className="flex items-center gap-3">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    ref={testButtonRef}
+                    disabled={testing}
+                    onClick={handleTest}
+                >
+                    {testing ? 'Testing…' : 'Test connection'}
+                </Button>
+                {testResult && (
+                    <span
+                        className={cn(
+                            'text-sm font-medium',
+                            testResult.success
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400',
+                        )}
+                    >
+                        {testResult.success ? '✓' : '✕'} {testResult.message}
+                    </span>
+                )}
             </div>
 
-            <div className="space-y-4">
-                <Heading
-                    variant="small"
-                    title="Driver options"
-                    description="PostgreSQL search path / SSL, MySQL charset, MongoDB DSN."
-                />
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="grid gap-2">
-                        <Label htmlFor="charset">Charset</Label>
-                        <Input
-                            id="charset"
-                            name="charset"
-                            defaultValue={defaults.charset}
-                            placeholder="utf8mb4"
-                        />
-                        <InputError message={errors.charset} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="collation">Collation</Label>
-                        <Input
-                            id="collation"
-                            name="collation"
-                            defaultValue={defaults.collation}
-                            placeholder="utf8mb4_unicode_ci"
-                        />
-                        <InputError message={errors.collation} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="search_path">Search path (PostgreSQL)</Label>
-                        <Input
-                            id="search_path"
-                            name="search_path"
-                            defaultValue={defaults.search_path}
-                            placeholder="public"
-                        />
-                        <InputError message={errors.search_path} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="sslmode">SSL mode (PostgreSQL)</Label>
-                        <Input
-                            id="sslmode"
-                            name="sslmode"
-                            defaultValue={defaults.sslmode}
-                            placeholder="prefer"
-                        />
-                        <InputError message={errors.sslmode} />
-                    </div>
-                    <div className="grid gap-2 sm:col-span-2">
-                        <Label htmlFor="ssl_ca_path">SSL CA path</Label>
-                        <Input
-                            id="ssl_ca_path"
-                            name="ssl_ca_path"
-                            defaultValue={defaults.ssl_ca_path}
-                        />
-                        <InputError message={errors.ssl_ca_path} />
-                    </div>
-                    <div className="grid gap-2 sm:col-span-2">
-                        <Label htmlFor="mongodb_dsn">MongoDB DSN (optional)</Label>
-                        <Input
-                            id="mongodb_dsn"
-                            name="mongodb_dsn"
-                            defaultValue={defaults.mongodb_dsn}
-                            autoComplete="off"
-                        />
-                        <InputError message={errors.mongodb_dsn} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="mongodb_authentication_database">
-                            MongoDB auth database
-                        </Label>
-                        <Input
-                            id="mongodb_authentication_database"
-                            name="mongodb_authentication_database"
-                            defaultValue={defaults.mongodb_authentication_database}
-                            placeholder="admin"
-                        />
-                        <InputError message={errors.mongodb_authentication_database} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="mongodb_read_preference">
-                            MongoDB read preference
-                        </Label>
-                        <Input
-                            id="mongodb_read_preference"
-                            name="mongodb_read_preference"
-                            defaultValue={defaults.mongodb_read_preference}
-                            placeholder="secondaryPreferred / primary"
-                        />
-                        <InputError message={errors.mongodb_read_preference} />
-                    </div>
-                </div>
-            </div>
+            {/* Advanced options */}
+            <details open={hasAdvancedErrors} className="group">
+                <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer list-none items-center gap-1 text-sm select-none">
+                    <svg
+                        className="size-3.5 rotate-0 transition-transform group-open:rotate-90"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                    Advanced options
+                    {hasAdvancedErrors && (
+                        <span className="ml-1 size-1.5 rounded-full bg-red-500" />
+                    )}
+                </summary>
 
-            <div className="space-y-4">
-                <Heading
-                    variant="small"
-                    title="Advanced JSON"
-                    description="Optional. SSH tunnel is metadata only; open the tunnel yourself and point host/port at localhost."
-                />
-                <div className="grid gap-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="ssh_tunnel">SSH tunnel (JSON)</Label>
-                        <textarea
-                            id="ssh_tunnel"
-                            name="ssh_tunnel"
-                            rows={4}
-                            defaultValue={defaults.ssh_tunnel}
-                            placeholder='{"bastion":"...","local_port":27018}'
-                            className={cn(
-                                'border-input placeholder:text-muted-foreground flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none',
-                                'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-                            )}
+                <div className="mt-4 space-y-4">
+                    <div className="flex flex-wrap gap-x-6 gap-y-3">
+                        <BooleanField
+                            name="is_active"
+                            label="Active"
+                            defaultChecked={defaults.is_active}
+                            error={errors.is_active}
                         />
-                        <InputError message={errors.ssh_tunnel} />
+                        <BooleanField
+                            name="writes_enabled"
+                            label="Writes enabled"
+                            defaultChecked={defaults.writes_enabled}
+                            error={errors.writes_enabled}
+                        />
+                        <BooleanField
+                            name="enforce_read_only_sql_guard"
+                            label="SQL read-only guard"
+                            defaultChecked={defaults.enforce_read_only_sql_guard}
+                            error={errors.enforce_read_only_sql_guard}
+                        />
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="extra_options">Extra options (JSON)</Label>
-                        <textarea
-                            id="extra_options"
-                            name="extra_options"
-                            rows={4}
-                            defaultValue={defaults.extra_options}
-                            placeholder='{"pdo":{},"mongo":{}}'
-                            className={cn(
-                                'border-input placeholder:text-muted-foreground flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none',
-                                'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-                            )}
-                        />
-                        <InputError message={errors.extra_options} />
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-2 sm:col-span-2">
+                            <Label htmlFor="url">
+                                Connection URL{' '}
+                                <span className="text-muted-foreground font-normal">(optional)</span>
+                            </Label>
+                            <Input
+                                id="url"
+                                name="url"
+                                defaultValue={defaults.url}
+                                placeholder="mysql://user:pass@host:3306/db"
+                                autoComplete="off"
+                            />
+                            <InputError message={errors.url} />
+                        </div>
+
+                        {driver === 'mysql' && (
+                            <>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="charset">Charset</Label>
+                                    <Input
+                                        id="charset"
+                                        name="charset"
+                                        defaultValue={defaults.charset}
+                                        placeholder="utf8mb4"
+                                    />
+                                    <InputError message={errors.charset} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="collation">Collation</Label>
+                                    <Input
+                                        id="collation"
+                                        name="collation"
+                                        defaultValue={defaults.collation}
+                                        placeholder="utf8mb4_unicode_ci"
+                                    />
+                                    <InputError message={errors.collation} />
+                                </div>
+                                <div className="grid gap-2 sm:col-span-2">
+                                    <Label htmlFor="unix_socket">Unix socket</Label>
+                                    <Input
+                                        id="unix_socket"
+                                        name="unix_socket"
+                                        defaultValue={defaults.unix_socket}
+                                    />
+                                    <InputError message={errors.unix_socket} />
+                                </div>
+                            </>
+                        )}
+
+                        {driver === 'pgsql' && (
+                            <div className="grid gap-2 sm:col-span-2">
+                                <Label htmlFor="ssl_ca_path">SSL CA path</Label>
+                                <Input
+                                    id="ssl_ca_path"
+                                    name="ssl_ca_path"
+                                    defaultValue={defaults.ssl_ca_path}
+                                />
+                                <InputError message={errors.ssl_ca_path} />
+                            </div>
+                        )}
+
+                        {driver === 'mongodb' && (
+                            <div className="grid gap-2 sm:col-span-2">
+                                <Label htmlFor="mongodb_read_preference">Read preference</Label>
+                                <Input
+                                    id="mongodb_read_preference"
+                                    name="mongodb_read_preference"
+                                    defaultValue={defaults.mongodb_read_preference}
+                                    placeholder="secondaryPreferred / primary"
+                                />
+                                <InputError message={errors.mongodb_read_preference} />
+                            </div>
+                        )}
+
+                        <div className="grid gap-2 sm:col-span-2">
+                            <Label htmlFor="extra_options">
+                                Extra options{' '}
+                                <span className="text-muted-foreground font-normal">(JSON)</span>
+                            </Label>
+                            <textarea
+                                id="extra_options"
+                                name="extra_options"
+                                rows={3}
+                                defaultValue={defaults.extra_options}
+                                placeholder='{"pdo":{}}'
+                                className={cn(
+                                    'border-input placeholder:text-muted-foreground flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none',
+                                    'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+                                )}
+                            />
+                            <InputError message={errors.extra_options} />
+                        </div>
                     </div>
                 </div>
-            </div>
+            </details>
         </div>
     );
 }

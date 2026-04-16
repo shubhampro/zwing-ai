@@ -14,6 +14,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('database-connections/activity-logs', [DatabaseConnectionController::class, 'activityLogs'])
         ->name('database-connections.activity-logs');
 
+    Route::post('database-connections/test', [DatabaseConnectionController::class, 'testConnection'])
+        ->name('database-connections.test');
+
     Route::resource('database-connections', DatabaseConnectionController::class)->except(['show', 'destroy']);
 });
 

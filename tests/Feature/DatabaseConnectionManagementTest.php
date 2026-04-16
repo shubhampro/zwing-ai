@@ -45,7 +45,6 @@ test('verified user can store a connection and an activity log is created', func
         'mongodb_dsn' => null,
         'mongodb_authentication_database' => null,
         'mongodb_read_preference' => null,
-        'ssh_tunnel' => null,
         'extra_options' => null,
     ];
 
@@ -90,7 +89,6 @@ test('verified user can update a connection and an activity log is created', fun
         'mongodb_dsn' => null,
         'mongodb_authentication_database' => null,
         'mongodb_read_preference' => null,
-        'ssh_tunnel' => null,
         'extra_options' => null,
     ];
 
@@ -100,6 +98,73 @@ test('verified user can update a connection and an activity log is created', fun
 
     expect(DatabaseConnectionLog::query()->where('action', 'updated')->count())->toBe(1);
     expect($connection->fresh()->label)->toBe('Updated');
+});
+
+test('test connection endpoint returns success for valid pgsql credentials', function () {
+    $user = User::factory()->create();
+
+    // Use TEST_PGSQL_* vars — phpunit does not override these.
+    $payload = [
+        'driver' => 'pgsql',
+        'access_mode' => 'read',
+        'host' => env('TEST_PGSQL_HOST', 'localhost'),
+        'port' => (int) env('TEST_PGSQL_PORT', 5432),
+        'database' => env('TEST_PGSQL_DATABASE', 'zwingai'),
+        'username' => env('TEST_PGSQL_USERNAME', 'appuser'),
+        'password' => env('TEST_PGSQL_PASSWORD', ''),
+    ];
+
+    $this->actingAs($user)
+        ->postJson(route('database-connections.test'), $payload)
+        ->assertOk()
+        ->assertJson(['success' => true]);
+});
+
+test('test connection endpoint returns failure for bad credentials', function () {
+    $user = User::factory()->create();
+
+    $payload = [
+        'driver' => 'pgsql',
+        'access_mode' => 'read',
+        'host' => '127.0.0.1',
+        'port' => 5432,
+        'database' => 'nonexistent_db_xyz',
+        'username' => 'bad_user_xyz',
+        'password' => 'definitely_wrong',
+    ];
+
+    $this->actingAs($user)
+        ->postJson(route('database-connections.test'), $payload)
+        ->assertOk()
+        ->assertJson(['success' => false]);
+});
+
+test('test connection endpoint restores stored password for existing connection', function () {
+    $user = User::factory()->create();
+    $connection = DatabaseConnection::factory()->create([
+        'driver' => 'pgsql',
+        'host' => env('TEST_PGSQL_HOST', 'localhost'),
+        'port' => (int) env('TEST_PGSQL_PORT', 5432),
+        'database' => env('TEST_PGSQL_DATABASE', 'zwingai'),
+        'username' => env('TEST_PGSQL_USERNAME', 'appuser'),
+        'password' => env('TEST_PGSQL_PASSWORD', ''),
+    ]);
+
+    $payload = [
+        'driver' => 'pgsql',
+        'access_mode' => 'read',
+        'host' => env('TEST_PGSQL_HOST', 'localhost'),
+        'port' => (int) env('TEST_PGSQL_PORT', 5432),
+        'database' => env('TEST_PGSQL_DATABASE', 'zwingai'),
+        'username' => env('TEST_PGSQL_USERNAME', 'appuser'),
+        'password' => '',
+        'connection_id' => $connection->id,
+    ];
+
+    $this->actingAs($user)
+        ->postJson(route('database-connections.test'), $payload)
+        ->assertOk()
+        ->assertJson(['success' => true]);
 });
 
 test('verified user can view activity logs page', function () {

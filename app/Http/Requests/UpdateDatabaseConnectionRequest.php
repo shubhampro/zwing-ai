@@ -62,7 +62,6 @@ class UpdateDatabaseConnectionRequest extends FormRequest
             'mongodb_dsn' => ['nullable', 'string', 'max:2048'],
             'mongodb_authentication_database' => ['nullable', 'string', 'max:255'],
             'mongodb_read_preference' => ['nullable', 'string', 'max:64'],
-            'ssh_tunnel' => ['nullable', 'string', $this->mustBeJsonString()],
             'extra_options' => ['nullable', 'string', $this->mustBeJsonString()],
         ];
     }
@@ -70,7 +69,6 @@ class UpdateDatabaseConnectionRequest extends FormRequest
     protected function passedValidation(): void
     {
         $this->merge([
-            'ssh_tunnel' => $this->decodedJson('ssh_tunnel'),
             'extra_options' => $this->decodedJson('extra_options'),
         ]);
     }

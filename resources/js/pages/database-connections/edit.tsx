@@ -39,6 +39,7 @@ export default function DatabaseConnectionsEdit({
                                 defaults={{ ...defaults, password: '' }}
                                 errors={errors}
                                 passwordMode="optional"
+                                connectionId={id}
                             />
                             <div className="flex gap-2">
                                 <Button type="submit" disabled={processing}>
