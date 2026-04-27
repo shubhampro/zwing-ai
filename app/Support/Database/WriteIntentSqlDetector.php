@@ -5,6 +5,14 @@ namespace App\Support\Database;
 final class WriteIntentSqlDetector
 {
     /**
+     * Strip leading SQL comments/whitespace so the first keyword can be inspected.
+     */
+    public static function normalizeLeadingStatement(string $sql): string
+    {
+        return self::stripLeadingCommentsAndWhitespace($sql);
+    }
+
+    /**
      * Whether a SQL string appears to be a mutating statement.
      *
      * This is a best-effort guard for PDO-based connections; prefer database
