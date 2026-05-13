@@ -1,5 +1,4 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
-import { DatabaseContextSelector } from '@/components/database-context-selector';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
 
@@ -14,11 +13,6 @@ export function AppSidebarHeader({
                 <SidebarTrigger className="-ml-1" />
                 <Breadcrumbs breadcrumbs={breadcrumbs} />
             </div>
-            <div
-                className="bg-border hidden h-7 w-px shrink-0 self-center sm:block"
-                aria-hidden
-            />
-            <DatabaseContextSelector />
         </header>
     );
 }

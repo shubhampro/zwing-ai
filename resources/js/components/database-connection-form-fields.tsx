@@ -34,8 +34,8 @@ export type DatabaseConnectionFormDefaults = {
 };
 
 const selectClass = cn(
-    'border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none',
-    'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+    'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none',
+    'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
 );
 
 function BooleanField({
@@ -58,7 +58,7 @@ function BooleanField({
                 value="1"
                 defaultChecked={defaultChecked}
                 id={name}
-                className="border-input text-primary focus-visible:ring-ring/50 size-4 rounded border shadow-xs outline-none focus-visible:ring-[3px]"
+                className="size-4 rounded border border-input text-primary shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             />
             <Label htmlFor={name} className="font-normal">
                 {label}
@@ -71,7 +71,9 @@ function BooleanField({
 type TestResult = { success: boolean; message: string };
 
 function getXsrfToken(): string {
-    const entry = document.cookie.split('; ').find((row) => row.startsWith('XSRF-TOKEN='));
+    const entry = document.cookie
+        .split('; ')
+        .find((row) => row.startsWith('XSRF-TOKEN='));
     return entry ? decodeURIComponent(entry.split('=')[1]) : '';
 }
 
@@ -106,7 +108,9 @@ export default function DatabaseConnectionFormFields({
     );
 
     async function handleTest() {
-        const form = testButtonRef.current?.closest('form') as HTMLFormElement | null;
+        const form = testButtonRef.current?.closest(
+            'form',
+        ) as HTMLFormElement | null;
         if (!form) return;
 
         setTesting(true);
@@ -130,7 +134,10 @@ export default function DatabaseConnectionFormFields({
             const result = (await response.json()) as TestResult;
             setTestResult(result);
         } catch {
-            setTestResult({ success: false, message: 'Request failed. Check your network.' });
+            setTestResult({
+                success: false,
+                message: 'Request failed. Check your network.',
+            });
         } finally {
             setTesting(false);
         }
@@ -199,7 +206,9 @@ export default function DatabaseConnectionFormFields({
                 <div className="grid gap-2 sm:col-span-2">
                     <Label htmlFor="label">
                         Label{' '}
-                        <span className="text-muted-foreground font-normal">(optional)</span>
+                        <span className="font-normal text-muted-foreground">
+                            (optional)
+                        </span>
                     </Label>
                     <Input
                         id="label"
@@ -217,7 +226,9 @@ export default function DatabaseConnectionFormFields({
                     <div className="grid gap-2 sm:col-span-2">
                         <Label htmlFor="mongodb_dsn">
                             Connection DSN{' '}
-                            <span className="text-muted-foreground font-normal">(optional)</span>
+                            <span className="font-normal text-muted-foreground">
+                                (optional)
+                            </span>
                         </Label>
                         <Input
                             id="mongodb_dsn"
@@ -230,18 +241,28 @@ export default function DatabaseConnectionFormFields({
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="database">Database name</Label>
-                        <Input id="database" name="database" defaultValue={defaults.database} />
+                        <Input
+                            id="database"
+                            name="database"
+                            defaultValue={defaults.database}
+                        />
                         <InputError message={errors.database} />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="mongodb_authentication_database">Auth database</Label>
+                        <Label htmlFor="mongodb_authentication_database">
+                            Auth database
+                        </Label>
                         <Input
                             id="mongodb_authentication_database"
                             name="mongodb_authentication_database"
-                            defaultValue={defaults.mongodb_authentication_database}
+                            defaultValue={
+                                defaults.mongodb_authentication_database
+                            }
                             placeholder="admin"
                         />
-                        <InputError message={errors.mongodb_authentication_database} />
+                        <InputError
+                            message={errors.mongodb_authentication_database}
+                        />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="username">Username</Label>
@@ -257,7 +278,7 @@ export default function DatabaseConnectionFormFields({
                         <Label htmlFor="password">
                             Password
                             {passwordMode === 'optional' && (
-                                <span className="text-muted-foreground font-normal">
+                                <span className="font-normal text-muted-foreground">
                                     {' '}
                                     — leave blank to keep
                                 </span>
@@ -305,7 +326,11 @@ export default function DatabaseConnectionFormFields({
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="database">Database name</Label>
-                        <Input id="database" name="database" defaultValue={defaults.database} />
+                        <Input
+                            id="database"
+                            name="database"
+                            defaultValue={defaults.database}
+                        />
                         <InputError message={errors.database} />
                     </div>
                     <div className="grid gap-2">
@@ -322,7 +347,7 @@ export default function DatabaseConnectionFormFields({
                         <Label htmlFor="password">
                             Password
                             {passwordMode === 'optional' && (
-                                <span className="text-muted-foreground font-normal">
+                                <span className="font-normal text-muted-foreground">
                                     {' '}
                                     — leave blank to keep
                                 </span>
@@ -393,7 +418,7 @@ export default function DatabaseConnectionFormFields({
 
             {/* Advanced options */}
             <details open={hasAdvancedErrors} className="group">
-                <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer list-none items-center gap-1 text-sm select-none">
+                <summary className="flex cursor-pointer list-none items-center gap-1 text-sm text-muted-foreground select-none hover:text-foreground">
                     <svg
                         className="size-3.5 rotate-0 transition-transform group-open:rotate-90"
                         fill="none"
@@ -401,7 +426,11 @@ export default function DatabaseConnectionFormFields({
                         stroke="currentColor"
                         strokeWidth={2}
                     >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M9 5l7 7-7 7"
+                        />
                     </svg>
                     Advanced options
                     {hasAdvancedErrors && (
@@ -426,7 +455,9 @@ export default function DatabaseConnectionFormFields({
                         <BooleanField
                             name="enforce_read_only_sql_guard"
                             label="SQL read-only guard"
-                            defaultChecked={defaults.enforce_read_only_sql_guard}
+                            defaultChecked={
+                                defaults.enforce_read_only_sql_guard
+                            }
                             error={errors.enforce_read_only_sql_guard}
                         />
                     </div>
@@ -435,7 +466,9 @@ export default function DatabaseConnectionFormFields({
                         <div className="grid gap-2 sm:col-span-2">
                             <Label htmlFor="url">
                                 Connection URL{' '}
-                                <span className="text-muted-foreground font-normal">(optional)</span>
+                                <span className="font-normal text-muted-foreground">
+                                    (optional)
+                                </span>
                             </Label>
                             <Input
                                 id="url"
@@ -470,7 +503,9 @@ export default function DatabaseConnectionFormFields({
                                     <InputError message={errors.collation} />
                                 </div>
                                 <div className="grid gap-2 sm:col-span-2">
-                                    <Label htmlFor="unix_socket">Unix socket</Label>
+                                    <Label htmlFor="unix_socket">
+                                        Unix socket
+                                    </Label>
                                     <Input
                                         id="unix_socket"
                                         name="unix_socket"
@@ -495,21 +530,29 @@ export default function DatabaseConnectionFormFields({
 
                         {driver === 'mongodb' && (
                             <div className="grid gap-2 sm:col-span-2">
-                                <Label htmlFor="mongodb_read_preference">Read preference</Label>
+                                <Label htmlFor="mongodb_read_preference">
+                                    Read preference
+                                </Label>
                                 <Input
                                     id="mongodb_read_preference"
                                     name="mongodb_read_preference"
-                                    defaultValue={defaults.mongodb_read_preference}
+                                    defaultValue={
+                                        defaults.mongodb_read_preference
+                                    }
                                     placeholder="secondaryPreferred / primary"
                                 />
-                                <InputError message={errors.mongodb_read_preference} />
+                                <InputError
+                                    message={errors.mongodb_read_preference}
+                                />
                             </div>
                         )}
 
                         <div className="grid gap-2 sm:col-span-2">
                             <Label htmlFor="extra_options">
                                 Extra options{' '}
-                                <span className="text-muted-foreground font-normal">(JSON)</span>
+                                <span className="font-normal text-muted-foreground">
+                                    (JSON)
+                                </span>
                             </Label>
                             <textarea
                                 id="extra_options"
@@ -518,8 +561,8 @@ export default function DatabaseConnectionFormFields({
                                 defaultValue={defaults.extra_options}
                                 placeholder='{"pdo":{}}'
                                 className={cn(
-                                    'border-input placeholder:text-muted-foreground flex w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none',
-                                    'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+                                    'flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground',
+                                    'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
                                 )}
                             />
                             <InputError message={errors.extra_options} />

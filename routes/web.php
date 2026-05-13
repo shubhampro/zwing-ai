@@ -2,8 +2,7 @@
 
 use App\Http\Controllers\DatabaseConnectionController;
 use App\Http\Controllers\DatabaseSessionContextController;
-use App\Http\Controllers\QueryTableController;
-use App\Http\Controllers\SavedQueryController;
+use App\Http\Controllers\StockTransactionReconciliationController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -14,14 +13,18 @@ Route::inertia('/', 'welcome', [
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
 
-    Route::inertia('stock-transaction-reconciliation', 'stock-transaction-reconciliation/index')
+    Route::get('stock-transaction-reconciliation', [StockTransactionReconciliationController::class, 'index'])
         ->name('stock-transaction-reconciliation.index');
-
-    Route::get('query-table', [QueryTableController::class, 'index'])->name('query-table.index');
-    Route::post('query-table/run', [QueryTableController::class, 'run'])->name('query-table.run');
-    Route::post('query-table/saved-queries', [SavedQueryController::class, 'store'])->name('query-table.saved-queries.store');
-    Route::put('query-table/saved-queries/{saved_query}', [SavedQueryController::class, 'update'])->name('query-table.saved-queries.update');
-    Route::delete('query-table/saved-queries/{saved_query}', [SavedQueryController::class, 'destroy'])->name('query-table.saved-queries.destroy');
+    Route::get('stock-transaction-reconciliation/create', [StockTransactionReconciliationController::class, 'create'])
+        ->name('stock-transaction-reconciliation.create');
+    Route::post('stock-transaction-reconciliation/csv', [StockTransactionReconciliationController::class, 'uploadCsv'])
+        ->name('stock-transaction-reconciliation.csv');
+    Route::get('stock-transaction-reconciliation/{stockReconSession}', [StockTransactionReconciliationController::class, 'show'])
+        ->name('stock-transaction-reconciliation.show');
+    Route::get('stock-transaction-reconciliation/{stockReconSession}/report', [StockTransactionReconciliationController::class, 'report'])
+        ->name('stock-transaction-reconciliation.report');
+    Route::delete('stock-transaction-reconciliation/{stockReconSession}', [StockTransactionReconciliationController::class, 'destroy'])
+        ->name('stock-transaction-reconciliation.destroy');
 
     Route::get('database-session-context/databases', [DatabaseSessionContextController::class, 'databases'])
         ->name('database-session-context.databases');

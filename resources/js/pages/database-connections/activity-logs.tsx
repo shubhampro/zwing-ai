@@ -2,10 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes';
-import {
-    activityLogs,
-    index,
-} from '@/routes/database-connections';
+import { activityLogs, index } from '@/routes/database-connections';
 
 type LogUser = {
     id: number;
@@ -52,7 +49,7 @@ export default function DatabaseConnectionActivityLogs({
 
                 <div className="space-y-4">
                     {logs.data.length === 0 && (
-                        <p className="text-muted-foreground text-sm">
+                        <p className="text-sm text-muted-foreground">
                             No log entries yet.
                         </p>
                     )}
@@ -69,33 +66,41 @@ export default function DatabaseConnectionActivityLogs({
                                     <span className="font-mono text-sm">
                                         {log.connection_slug}
                                     </span>
-                                    <span className="text-muted-foreground text-sm">
+                                    <span className="text-sm text-muted-foreground">
                                         group: {log.connection_group}
                                     </span>
                                 </div>
                                 <time
-                                    className="text-muted-foreground text-xs"
+                                    className="text-xs text-muted-foreground"
                                     dateTime={log.created_at}
                                 >
                                     {log.created_at}
                                 </time>
                             </div>
-                            <p className="text-muted-foreground text-xs">
-                                {log.user?.name ?? 'Unknown'} ({log.user?.email}) ·{' '}
-                                {log.ip_address ?? '—'}
+                            <p className="text-xs text-muted-foreground">
+                                {log.user?.name ?? 'Unknown'} ({log.user?.email}
+                                ) · {log.ip_address ?? '—'}
                             </p>
                             <div className="grid gap-3 md:grid-cols-2">
                                 <div>
-                                    <p className="mb-1 text-xs font-medium">Before</p>
-                                    <pre className="bg-muted/50 max-h-48 overflow-auto rounded-md p-2 text-[11px] leading-relaxed whitespace-pre-wrap">
+                                    <p className="mb-1 text-xs font-medium">
+                                        Before
+                                    </p>
+                                    <pre className="max-h-48 overflow-auto rounded-md bg-muted/50 p-2 text-[11px] leading-relaxed whitespace-pre-wrap">
                                         {log.before
-                                            ? JSON.stringify(log.before, null, 2)
+                                            ? JSON.stringify(
+                                                  log.before,
+                                                  null,
+                                                  2,
+                                              )
                                             : '—'}
                                     </pre>
                                 </div>
                                 <div>
-                                    <p className="mb-1 text-xs font-medium">After</p>
-                                    <pre className="bg-muted/50 max-h-48 overflow-auto rounded-md p-2 text-[11px] leading-relaxed whitespace-pre-wrap">
+                                    <p className="mb-1 text-xs font-medium">
+                                        After
+                                    </p>
+                                    <pre className="max-h-48 overflow-auto rounded-md bg-muted/50 p-2 text-[11px] leading-relaxed whitespace-pre-wrap">
                                         {log.after
                                             ? JSON.stringify(log.after, null, 2)
                                             : '—'}
@@ -107,7 +112,10 @@ export default function DatabaseConnectionActivityLogs({
                 </div>
 
                 {logs.links.length > 3 && (
-                    <nav className="flex flex-wrap gap-2" aria-label="Pagination">
+                    <nav
+                        className="flex flex-wrap gap-2"
+                        aria-label="Pagination"
+                    >
                         {logs.links.map((link, i) => {
                             const label = link.label
                                 .replace(/<span[^>]*>|<\/span>/g, '')
@@ -118,7 +126,9 @@ export default function DatabaseConnectionActivityLogs({
                             return (
                                 <Button
                                     key={i}
-                                    variant={link.active ? 'default' : 'outline'}
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
                                     size="sm"
                                     disabled={!link.url}
                                     asChild={!!link.url}

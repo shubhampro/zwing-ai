@@ -53,10 +53,16 @@ export default function DatabaseConnectionsIndex({
                             <tr>
                                 <th className="px-3 py-2 font-medium">Slug</th>
                                 <th className="px-3 py-2 font-medium">Group</th>
-                                <th className="px-3 py-2 font-medium">Driver</th>
+                                <th className="px-3 py-2 font-medium">
+                                    Driver
+                                </th>
                                 <th className="px-3 py-2 font-medium">Mode</th>
-                                <th className="px-3 py-2 font-medium">Active</th>
-                                <th className="px-3 py-2 font-medium">Writes</th>
+                                <th className="px-3 py-2 font-medium">
+                                    Active
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                    Writes
+                                </th>
                                 <th className="px-3 py-2 font-medium">Guard</th>
                                 <th className="px-3 py-2 font-medium" />
                             </tr>
@@ -66,7 +72,7 @@ export default function DatabaseConnectionsIndex({
                                 <tr>
                                     <td
                                         colSpan={8}
-                                        className="text-muted-foreground px-3 py-8 text-center"
+                                        className="px-3 py-8 text-center text-muted-foreground"
                                     >
                                         No connections yet.{' '}
                                         <Link
@@ -87,9 +93,13 @@ export default function DatabaseConnectionsIndex({
                                     <td className="px-3 py-2 font-mono text-xs">
                                         {c.slug}
                                     </td>
-                                    <td className="px-3 py-2">{c.connection_group}</td>
+                                    <td className="px-3 py-2">
+                                        {c.connection_group}
+                                    </td>
                                     <td className="px-3 py-2">{c.driver}</td>
-                                    <td className="px-3 py-2">{c.access_mode}</td>
+                                    <td className="px-3 py-2">
+                                        {c.access_mode}
+                                    </td>
                                     <td className="px-3 py-2">
                                         {c.is_active ? 'Yes' : 'No'}
                                     </td>
@@ -97,11 +107,19 @@ export default function DatabaseConnectionsIndex({
                                         {c.writes_enabled ? 'Yes' : 'No'}
                                     </td>
                                     <td className="px-3 py-2">
-                                        {c.enforce_read_only_sql_guard ? 'Yes' : 'No'}
+                                        {c.enforce_read_only_sql_guard
+                                            ? 'Yes'
+                                            : 'No'}
                                     </td>
                                     <td className="px-3 py-2 text-right">
-                                        <Button variant="ghost" size="sm" asChild>
-                                            <Link href={edit.url(c.id)}>Edit</Link>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            asChild
+                                        >
+                                            <Link href={edit.url(c.id)}>
+                                                Edit
+                                            </Link>
                                         </Button>
                                     </td>
                                 </tr>

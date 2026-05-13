@@ -1,4 +1,7 @@
-import type { ActiveDatabaseContext, DatabaseConnectionOption } from '@/types/database-context';
+import type {
+    ActiveDatabaseContext,
+    DatabaseConnectionOption,
+} from '@/types/database-context';
 import type { Auth } from '@/types/auth';
 
 declare module '@inertiajs/core' {
