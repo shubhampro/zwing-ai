@@ -144,17 +144,19 @@ class ParseStockReconciliationCsv implements ShouldQueue
     /**
      * Required non-empty columns per row (batch_no is optional).
      */
-    private const REQUIRED_ROW_COLUMNS = ['barcode', 'icode', 'site_code', 'sprefcode', 'stock_point_name'];
-
     /**
-     * A row is valid when all required columns are non-empty and qty is numeric.
-     * batch_no is intentionally excluded — it may be blank in the source data.
+     * A row is valid when it has at least one identifier (barcode or icode),
+     * site_code + stock_point_name non-empty, and qty is numeric.
      *
      * @param  array<string, string>  $record
      */
     private function isValidRow(array $record): bool
     {
-        foreach (self::REQUIRED_ROW_COLUMNS as $col) {
+        if (! isset($record['icode']) || trim((string) $record['icode']) === '') {
+            return false;
+        }
+
+        foreach (['site_code', 'stock_point_name'] as $col) {
             if (! isset($record[$col]) || trim((string) $record[$col]) === '') {
                 return false;
             }

@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, X } from 'lucide-react';
+import { ArrowLeft, Download, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes';
@@ -86,6 +86,7 @@ export default function StockTransactionReconciliationReport({ session, summary,
 
             <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Header */}
+                <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <Link href={show.url(session.id)}>
                         <Button variant="outline" size="icon" className="shrink-0">
@@ -99,6 +100,16 @@ export default function StockTransactionReconciliationReport({ session, summary,
                         </h1>
                         <p className="text-muted-foreground mt-0.5 text-sm">{session.name} · Vendor ID {session.v_id}</p>
                     </div>
+                </div>
+                    <a
+                        href={`/stock-transaction-reconciliation/${session.id}/report/export${filter !== 'all' ? `?filter=${filter}` : ''}`}
+                        download
+                    >
+                        <Button variant="outline" size="sm">
+                            <Download className="size-4" />
+                            Export CSV
+                        </Button>
+                    </a>
                 </div>
 
                 {/* Summary cards */}

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StockTransactionReconciliationController extends Controller
 {
@@ -82,30 +83,7 @@ class StockTransactionReconciliationController extends Controller
         $page = max(1, (int) $request->get('page', 1));
         $sessionId = $stockReconSession->id;
 
-        $comparisonSql = <<<'SQL'
-            SELECT
-                COALESCE(z.site_code, e.site_code)               AS site_code,
-                COALESCE(z.icode, e.icode)                       AS icode,
-                COALESCE(z.batch_no, e.batch_no)                 AS batch_no,
-                CAST(COALESCE(z.sprefcode, e.sprefcode) AS TEXT) AS sprefcode,
-                COALESCE(z.stock_point_name, e.stock_point_name) AS stock_point_name,
-                z.qty                                             AS zwing_qty,
-                e.qty                                             AS erp_qty,
-                CASE
-                    WHEN z.id IS NULL THEN 'erp_only'
-                    WHEN e.id IS NULL THEN 'zwing_only'
-                    WHEN z.qty = e.qty THEN 'matched'
-                    ELSE 'qty_mismatch'
-                END AS match_status
-            FROM zwing_stock_reconsile z
-            FULL OUTER JOIN erp_stock_reconsile e
-                ON  z.session_id = e.session_id
-                AND z.site_code  = e.site_code
-                AND z.icode      = e.icode
-                AND z.batch_no   = e.batch_no
-                AND z.sprefcode  = e.sprefcode
-            WHERE COALESCE(z.session_id, e.session_id) = ?
-        SQL;
+        $comparisonSql = $this->comparisonSql();
 
         $summary = DB::selectOne(<<<SQL
             SELECT
@@ -142,6 +120,57 @@ class StockTransactionReconciliationController extends Controller
             ],
             'filter' => $filter,
         ]);
+    }
+
+    public function exportReport(Request $request, StockReconSession $stockReconSession): StreamedResponse
+    {
+        abort_if($request->user() === null, 403);
+        abort_if($stockReconSession->user_id !== $request->user()->id, 403);
+
+        $filter = $request->get('filter', 'all');
+        $sessionId = $stockReconSession->id;
+        $comparisonSql = $this->comparisonSql();
+        $filterClause = $filter !== 'all' ? 'WHERE match_status = ?' : '';
+        $filterParams = $filter !== 'all' ? [$sessionId, $filter] : [$sessionId];
+
+        $rows = DB::select(
+            "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY site_code, icode",
+            $filterParams,
+        );
+
+        $segment = $filter === 'all' ? 'all' : $filter;
+        $slug = preg_replace('/[^a-z0-9]+/i', '-', $stockReconSession->name);
+        $filename = "{$slug}-{$segment}.csv";
+
+        return response()->streamDownload(function () use ($rows): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, ['site_code', 'icode', 'batch_no', 'sprefcode', 'stock_point_name', 'zwing_qty', 'erp_qty', 'difference', 'status']);
+
+            foreach ($rows as $row) {
+                $zwingQty = $row->zwing_qty;
+                $erpQty = $row->erp_qty;
+                $diff = ($zwingQty !== null && $erpQty !== null) ? $zwingQty - $erpQty : '';
+
+                fputcsv($handle, [
+                    $row->site_code,
+                    $row->icode,
+                    $row->batch_no ?? '',
+                    $row->sprefcode,
+                    $row->stock_point_name,
+                    $zwingQty ?? '',
+                    $erpQty ?? '',
+                    $diff,
+                    $row->match_status,
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     public function uploadCsv(StoreStockReconciliationCsvRequest $request): RedirectResponse
@@ -203,6 +232,34 @@ class StockTransactionReconciliationController extends Controller
         ]);
 
         return redirect()->route('stock-transaction-reconciliation.index');
+    }
+
+    private function comparisonSql(): string
+    {
+        return <<<'SQL'
+            SELECT
+                COALESCE(z.site_code, e.site_code)               AS site_code,
+                COALESCE(z.icode, e.icode)                       AS icode,
+                COALESCE(z.batch_no, e.batch_no)                 AS batch_no,
+                CAST(COALESCE(z.sprefcode, e.sprefcode) AS TEXT) AS sprefcode,
+                COALESCE(z.stock_point_name, e.stock_point_name) AS stock_point_name,
+                z.qty                                             AS zwing_qty,
+                e.qty                                             AS erp_qty,
+                CASE
+                    WHEN z.id IS NULL THEN 'erp_only'
+                    WHEN e.id IS NULL THEN 'zwing_only'
+                    WHEN z.qty = e.qty THEN 'matched'
+                    ELSE 'qty_mismatch'
+                END AS match_status
+            FROM zwing_stock_reconsile z
+            FULL OUTER JOIN erp_stock_reconsile e
+                ON  z.session_id = e.session_id
+                AND z.site_code  = e.site_code
+                AND z.icode      = e.icode
+                AND z.batch_no   = e.batch_no
+                AND z.sprefcode  = e.sprefcode
+            WHERE COALESCE(z.session_id, e.session_id) = ?
+        SQL;
     }
 
     private function countLines(string $path): int

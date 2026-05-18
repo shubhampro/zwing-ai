@@ -23,6 +23,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('stock-transaction-reconciliation.show');
     Route::get('stock-transaction-reconciliation/{stockReconSession}/report', [StockTransactionReconciliationController::class, 'report'])
         ->name('stock-transaction-reconciliation.report');
+    Route::get('stock-transaction-reconciliation/{stockReconSession}/report/export', [StockTransactionReconciliationController::class, 'exportReport'])
+        ->name('stock-transaction-reconciliation.report.export');
     Route::delete('stock-transaction-reconciliation/{stockReconSession}', [StockTransactionReconciliationController::class, 'destroy'])
         ->name('stock-transaction-reconciliation.destroy');
 
