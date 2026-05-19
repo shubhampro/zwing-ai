@@ -1,7 +1,5 @@
 <?php
 
-use App\Http\Controllers\DatabaseConnectionController;
-use App\Http\Controllers\DatabaseSessionContextController;
 use App\Http\Controllers\StockTransactionReconciliationController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -27,19 +25,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('stock-transaction-reconciliation.report.export');
     Route::delete('stock-transaction-reconciliation/{stockReconSession}', [StockTransactionReconciliationController::class, 'destroy'])
         ->name('stock-transaction-reconciliation.destroy');
-
-    Route::get('database-session-context/databases', [DatabaseSessionContextController::class, 'databases'])
-        ->name('database-session-context.databases');
-    Route::put('database-session-context', [DatabaseSessionContextController::class, 'update'])
-        ->name('database-session-context.update');
-
-    Route::get('database-connections/activity-logs', [DatabaseConnectionController::class, 'activityLogs'])
-        ->name('database-connections.activity-logs');
-
-    Route::post('database-connections/test', [DatabaseConnectionController::class, 'testConnection'])
-        ->name('database-connections.test');
-
-    Route::resource('database-connections', DatabaseConnectionController::class)->except(['show', 'destroy']);
 });
 
 require __DIR__.'/settings.php';

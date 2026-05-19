@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { ArrowLeftRight, Database, LayoutGrid } from 'lucide-react';
+import { ArrowLeftRight, LayoutGrid } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,7 +14,6 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { index as databaseConnectionsIndex } from '@/routes/database-connections';
 import { index as stockTransactionReconciliationIndex } from '@/routes/stock-transaction-reconciliation';
 import type { NavItem } from '@/types';
 
@@ -23,11 +22,6 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
-    },
-    {
-        title: 'Connections',
-        href: databaseConnectionsIndex.url(),
-        icon: Database,
     },
     {
         title: 'Stock reconciliation',
