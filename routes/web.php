@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\StockTransactionReconciliationController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -10,6 +11,9 @@ Route::inertia('/', 'welcome', [
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
+
+    Route::resource('organizations', OrganizationController::class)
+        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
     Route::get('stock-transaction-reconciliation', [StockTransactionReconciliationController::class, 'index'])
         ->name('stock-transaction-reconciliation.index');
