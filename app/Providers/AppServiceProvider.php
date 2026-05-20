@@ -24,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->enforceReadOnlyRemoteConnections();
     }
 
     /**
@@ -46,5 +47,24 @@ class AppServiceProvider extends ServiceProvider
                 ->uncompromised()
             : null,
         );
+    }
+
+    /**
+     * Prevent any write queries on remote read-only connections.
+     *
+     * Both mysql_ssh and mongodb_ssh are remote read-only sources.
+     * Throws a RuntimeException if INSERT/UPDATE/DELETE/DDL is attempted.
+     */
+    protected function enforceReadOnlyRemoteConnections(): void
+    {
+        $writePattern = '/^\s*(insert|update|delete|drop|truncate|alter|create|replace|rename)\b/i';
+
+        foreach (['mysql_ssh', 'mongodb_ssh'] as $connection) {
+            DB::connection($connection)->beforeExecuting(function (string $sql) use ($connection, $writePattern): void {
+                if (preg_match($writePattern, $sql)) {
+                    throw new \RuntimeException("Connection [{$connection}] is read-only. Write query rejected: {$sql}");
+                }
+            });
+        }
     }
 }

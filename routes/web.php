@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\StockTransactionReconciliationController;
+use App\Http\Controllers\TransactionCheckerController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -29,6 +30,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('stock-transaction-reconciliation.report.export');
     Route::delete('stock-transaction-reconciliation/{stockReconSession}', [StockTransactionReconciliationController::class, 'destroy'])
         ->name('stock-transaction-reconciliation.destroy');
+
+    Route::get('transaction-checker', [TransactionCheckerController::class, 'index'])
+        ->name('transaction-checker.index');
+    Route::get('transaction-checker/databases', [TransactionCheckerController::class, 'databases'])
+        ->name('transaction-checker.databases');
+    Route::post('transaction-checker/check', [TransactionCheckerController::class, 'check'])
+        ->name('transaction-checker.check');
 });
 
 require __DIR__.'/settings.php';

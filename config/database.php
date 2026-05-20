@@ -99,6 +99,34 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        'mysql_ssh' => [
+            'driver' => 'mysql',
+            'host' => env('MYSQL_REMOTE_HOST', '127.0.0.1'),
+            'port' => env('MYSQL_REMOTE_PORT', 3306),
+            'database' => env('MYSQL_REMOTE_DATABASE', ''),
+            'username' => env('MYSQL_REMOTE_USERNAME', ''),
+            'password' => env('MYSQL_REMOTE_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => [],
+        ],
+
+        'mongodb_ssh' => [
+            'driver' => 'mongodb',
+            'host' => '127.0.0.1',
+            'port' => env('MONGODB_SSH_LOCAL_PORT', 37017),
+            'database' => env('MONGODB_SSH_DATABASE', ''),
+            'username' => env('MONGODB_SSH_USERNAME', ''),
+            'password' => env('MONGODB_SSH_PASSWORD', ''),
+            'options' => [
+                'database' => env('MONGODB_SSH_DATABASE', ''),
+            ],
+        ],
+
         /*
         |--------------------------------------------------------------------------
         | Dynamic remote connections
