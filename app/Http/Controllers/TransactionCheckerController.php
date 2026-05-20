@@ -3,6 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Organization;
+use App\Models\TransactionCheckerSession;
+use App\Services\TransactionChecker\GrnChecker;
+use App\Services\TransactionChecker\GrtChecker;
+use App\Services\TransactionChecker\SstChecker;
+use App\Services\TransactionChecker\TransactionCheckerInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
@@ -15,14 +20,20 @@ class TransactionCheckerController extends Controller
     /** @var array<string, string> */
     private const CONNECTIONS = [
         'mysql_ssh' => 'MySQL (SSH)',
-        'mongodb_ssh' => 'MongoDB (SSH)',
+    ];
+
+    /** @var array<string, class-string<TransactionCheckerInterface>> */
+    private const CHECKERS = [
+        'grn' => GrnChecker::class,
+        'grt' => GrtChecker::class,
+        'sst' => SstChecker::class,
     ];
 
     /** @var array<string, string> */
     private const TRANSACTION_TYPES = [
         'grn' => 'GRN – Goods Receipt Note',
         'grt' => 'GRT – Goods Return to Vendor',
-        'sst' => 'SST – Stock Transfer',
+        'sst' => 'SST – Stock Store Transfer',
     ];
 
     public function index(Request $request): Response
@@ -40,6 +51,23 @@ class TransactionCheckerController extends Controller
             'connections' => self::CONNECTIONS,
             'transactionTypes' => self::TRANSACTION_TYPES,
             'organizations' => $organizations,
+            'sessions' => Inertia::defer(fn () => TransactionCheckerSession::with('organization')
+                ->where('user_id', $request->user()->id)
+                ->latest()
+                ->limit(20)
+                ->get()
+                ->map(fn (TransactionCheckerSession $session) => [
+                    'id' => $session->id,
+                    'org_label' => $session->organization?->name.' ('.$session->organization?->ba_code.')',
+                    'connection' => $session->connection,
+                    'transaction_type' => $session->transaction_type,
+                    'database' => $session->database,
+                    'summary' => $session->summary,
+                    'ran_at' => $session->created_at->diffForHumans(),
+                    // restore params
+                    'org_id' => (string) $session->org_id,
+                ])
+            ),
         ]);
     }
 
@@ -89,36 +117,42 @@ class TransactionCheckerController extends Controller
             $validated['database'],
         );
 
+        TransactionCheckerSession::create([
+            'user_id' => $request->user()->id,
+            'org_id' => $validated['org_id'],
+            'connection' => $validated['connection'],
+            'transaction_type' => $validated['transaction_type'],
+            'database' => $validated['database'],
+            'summary' => $results['summary'],
+        ]);
+
         return response()->json($results);
     }
 
+    public function destroySession(Request $request, TransactionCheckerSession $session): JsonResponse
+    {
+        abort_if($request->user() === null, 403);
+        abort_if($session->user_id !== $request->user()->id, 403);
+
+        $session->delete();
+
+        return response()->json(['message' => 'Deleted.']);
+    }
+
     /**
-     * @return array{summary: array<string, int>, rows: array<int, object>}
+     * @return array{summary: array<string, int>, rows: array<int, array<string, mixed>>}
      */
     private function runCheck(string $connection, string $txnType, int $orgId, string $database): array
     {
-        // Dynamically set the database on the connection
         $config = Config::get("database.connections.{$connection}");
         $config['database'] = $database;
         Config::set("database.connections.{$connection}_dynamic", $config);
 
-        $headerTable = "{$txnType}_header";
+        $db = DB::connection("{$connection}_dynamic");
 
-        $rows = DB::connection("{$connection}_dynamic")
-            ->table($headerTable.' as h')
-            ->select(['h.id', 'h.doc_no', 'h.doc_date', 'h.site_code'])
-            ->orderBy('h.doc_date', 'desc')
-            ->limit(500)
-            ->get()
-            ->toArray();
+        /** @var TransactionCheckerInterface $checker */
+        $checker = new (self::CHECKERS[$txnType])();
 
-        $summary = [
-            'total' => count($rows),
-            'matched' => 0,
-            'mismatch' => 0,
-            'missing_details' => 0,
-        ];
-
-        return compact('summary', 'rows');
+        return $checker->run($db);
     }
 }

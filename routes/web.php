@@ -37,6 +37,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('transaction-checker.databases');
     Route::post('transaction-checker/check', [TransactionCheckerController::class, 'check'])
         ->name('transaction-checker.check');
+    Route::delete('transaction-checker/sessions/{session}', [TransactionCheckerController::class, 'destroySession'])
+        ->name('transaction-checker.sessions.destroy');
 });
 
 require __DIR__.'/settings.php';
