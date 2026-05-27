@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DatabaseConnectionController;
 use App\Http\Controllers\DatabaseSessionContextController;
+use App\Http\Controllers\InvoiceReconciliationController;
 use App\Http\Controllers\StockTransactionReconciliationController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -27,6 +28,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('stock-transaction-reconciliation.report.export');
     Route::delete('stock-transaction-reconciliation/{stockReconSession}', [StockTransactionReconciliationController::class, 'destroy'])
         ->name('stock-transaction-reconciliation.destroy');
+
+    Route::get('invoice-reconciliation', [InvoiceReconciliationController::class, 'index'])
+        ->name('invoice-reconciliation.index');
+    Route::get('invoice-reconciliation/create', [InvoiceReconciliationController::class, 'create'])
+        ->name('invoice-reconciliation.create');
+    Route::post('invoice-reconciliation/csv', [InvoiceReconciliationController::class, 'uploadCsv'])
+        ->name('invoice-reconciliation.csv');
+    Route::get('invoice-reconciliation/{invoiceReconSession}', [InvoiceReconciliationController::class, 'show'])
+        ->name('invoice-reconciliation.show');
+    Route::get('invoice-reconciliation/{invoiceReconSession}/report', [InvoiceReconciliationController::class, 'report'])
+        ->name('invoice-reconciliation.report');
+    Route::get('invoice-reconciliation/{invoiceReconSession}/report/export', [InvoiceReconciliationController::class, 'exportReport'])
+        ->name('invoice-reconciliation.report.export');
+    Route::delete('invoice-reconciliation/{invoiceReconSession}', [InvoiceReconciliationController::class, 'destroy'])
+        ->name('invoice-reconciliation.destroy');
 
     Route::get('database-session-context/databases', [DatabaseSessionContextController::class, 'databases'])
         ->name('database-session-context.databases');
