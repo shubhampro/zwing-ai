@@ -1,6 +1,10 @@
 <?php
 
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DatabaseConnectionController;
+use App\Http\Controllers\DatabaseSessionContextController;
+use App\Http\Controllers\InvoiceReconciliationController;
 use App\Http\Controllers\StockTransactionReconciliationController;
 use App\Http\Controllers\TransactionCheckerController;
 use Illuminate\Support\Facades\Route;
@@ -11,7 +15,7 @@ Route::inertia('/', 'welcome', [
 ])->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
+    Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::resource('organizations', OrganizationController::class)
         ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
@@ -45,6 +49,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('transaction-checker.check');
     Route::delete('transaction-checker/sessions/{session}', [TransactionCheckerController::class, 'destroySession'])
         ->name('transaction-checker.sessions.destroy');
+    Route::get('invoice-reconciliation', [InvoiceReconciliationController::class, 'index'])
+        ->name('invoice-reconciliation.index');
+    Route::get('invoice-reconciliation/create', [InvoiceReconciliationController::class, 'create'])
+        ->name('invoice-reconciliation.create');
+    Route::post('invoice-reconciliation/csv', [InvoiceReconciliationController::class, 'uploadCsv'])
+        ->name('invoice-reconciliation.csv');
+    Route::get('invoice-reconciliation/{invoiceReconSession}', [InvoiceReconciliationController::class, 'show'])
+        ->name('invoice-reconciliation.show');
+    Route::get('invoice-reconciliation/{invoiceReconSession}/report', [InvoiceReconciliationController::class, 'report'])
+        ->name('invoice-reconciliation.report');
+    Route::get('invoice-reconciliation/{invoiceReconSession}/report/export', [InvoiceReconciliationController::class, 'exportReport'])
+        ->name('invoice-reconciliation.report.export');
+    Route::delete('invoice-reconciliation/{invoiceReconSession}', [InvoiceReconciliationController::class, 'destroy'])
+        ->name('invoice-reconciliation.destroy');
 });
 
 require __DIR__.'/settings.php';

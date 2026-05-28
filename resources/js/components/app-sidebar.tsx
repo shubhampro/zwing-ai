@@ -3,6 +3,8 @@ import {
     ArrowLeftRight,
     Building2,
     ClipboardCheck,
+    Database,
+    FileText,
     LayoutGrid,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -19,9 +21,11 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { index as organizationsIndex } from '@/routes/organizations';
+import { index as databaseConnectionsIndex } from '@/routes/database-connections';
+import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconciliation';
 import { index as stockTransactionReconciliationIndex } from '@/routes/stock-transaction-reconciliation';
 import { index as transactionCheckerIndex } from '@/routes/transaction-checker';
+import { index as organizationsIndex } from '@/routes/organizations';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -44,6 +48,11 @@ const mainNavItems: NavItem[] = [
         title: 'Transaction Checker',
         href: transactionCheckerIndex.url(),
         icon: ClipboardCheck,
+    },
+    {
+        title: 'Invoice reconciliation',
+        href: invoiceReconciliationIndex.url(),
+        icon: FileText,
     },
 ];
 
