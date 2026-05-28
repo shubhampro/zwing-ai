@@ -37,7 +37,10 @@ type SessionRow = {
     created_at: string;
 };
 
-const statusVariant: Record<SessionStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const statusVariant: Record<
+    SessionStatus,
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
     pending: 'secondary',
     processing: 'outline',
     completed: 'default',
@@ -54,7 +57,15 @@ function formatDate(iso: string | null): string {
     });
 }
 
-function DeleteDialog({ session, open, onOpenChange }: { session: SessionRow; open: boolean; onOpenChange: (v: boolean) => void }) {
+function DeleteDialog({
+    session,
+    open,
+    onOpenChange,
+}: {
+    session: SessionRow;
+    open: boolean;
+    onOpenChange: (v: boolean) => void;
+}) {
     const { delete: deleteSession, processing } = useForm();
 
     function confirm() {
@@ -69,15 +80,27 @@ function DeleteDialog({ session, open, onOpenChange }: { session: SessionRow; op
                 <DialogHeader>
                     <DialogTitle>Delete reconciliation session?</DialogTitle>
                     <DialogDescription>
-                        This will permanently delete <span className="text-foreground font-medium">"{session.name}"</span> and all
-                        associated Zwing and ERP invoice rows. This action cannot be undone.
+                        This will permanently delete{' '}
+                        <span className="font-medium text-foreground">
+                            "{session.name}"
+                        </span>{' '}
+                        and all associated Zwing and ERP invoice rows. This
+                        action cannot be undone.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={processing}>
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                        disabled={processing}
+                    >
                         Cancel
                     </Button>
-                    <Button variant="destructive" onClick={confirm} disabled={processing}>
+                    <Button
+                        variant="destructive"
+                        onClick={confirm}
+                        disabled={processing}
+                    >
                         {processing ? 'Deleting…' : 'Delete'}
                     </Button>
                 </DialogFooter>
@@ -86,8 +109,14 @@ function DeleteDialog({ session, open, onOpenChange }: { session: SessionRow; op
     );
 }
 
-export default function InvoiceReconciliationIndex({ sessions }: { sessions: SessionRow[] }) {
-    const [deletingSession, setDeletingSession] = useState<SessionRow | null>(null);
+export default function InvoiceReconciliationIndex({
+    sessions,
+}: {
+    sessions: SessionRow[];
+}) {
+    const [deletingSession, setDeletingSession] = useState<SessionRow | null>(
+        null,
+    );
 
     return (
         <>
@@ -110,53 +139,96 @@ export default function InvoiceReconciliationIndex({ sessions }: { sessions: Ses
                             <tr>
                                 <th className="px-3 py-2 font-medium">#</th>
                                 <th className="px-3 py-2 font-medium">Name</th>
-                                <th className="px-3 py-2 font-medium">Vendor ID</th>
-                                <th className="px-3 py-2 font-medium">Zwing rows</th>
-                                <th className="px-3 py-2 font-medium">ERP rows</th>
-                                <th className="px-3 py-2 font-medium">Status</th>
-                                <th className="px-3 py-2 font-medium">Created at</th>
+                                <th className="px-3 py-2 font-medium">
+                                    Vendor ID
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                    Zwing rows
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                    ERP rows
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                    Status
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                    Created at
+                                </th>
                                 <th className="px-3 py-2 font-medium" />
                             </tr>
                         </thead>
                         <tbody>
                             {sessions.length === 0 && (
                                 <tr>
-                                    <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
+                                    <td
+                                        colSpan={8}
+                                        className="px-3 py-8 text-center text-muted-foreground"
+                                    >
                                         No reconciliation sessions found.{' '}
-                                        <Link href={create.url()} className="text-foreground underline">
+                                        <Link
+                                            href={create.url()}
+                                            className="text-foreground underline"
+                                        >
                                             Start a new reconciliation
                                         </Link>{' '}
-                                        by uploading Zwing and ERP invoice CSV files.
+                                        by uploading Zwing and ERP invoice CSV
+                                        files.
                                     </td>
                                 </tr>
                             )}
                             {sessions.map((s) => (
-                                <tr key={s.id} className="border-t border-sidebar-border/70 dark:border-sidebar-border">
+                                <tr
+                                    key={s.id}
+                                    className="border-t border-sidebar-border/70 dark:border-sidebar-border"
+                                >
                                     <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                                        <Link href={show.url(s.id)} className="hover:underline">
+                                        <Link
+                                            href={show.url(s.id)}
+                                            className="hover:underline"
+                                        >
                                             {s.id}
                                         </Link>
                                     </td>
                                     <td className="px-3 py-2 font-medium">
-                                        <Link href={show.url(s.id)} className="hover:underline">
+                                        <Link
+                                            href={show.url(s.id)}
+                                            className="hover:underline"
+                                        >
                                             {s.name}
                                         </Link>
                                     </td>
-                                    <td className="px-3 py-2 tabular-nums">{s.v_id}</td>
-                                    <td className="px-3 py-2 tabular-nums">{s.zwing_row_count ?? '—'}</td>
-                                    <td className="px-3 py-2 tabular-nums">{s.erp_row_count ?? '—'}</td>
+                                    <td className="px-3 py-2 tabular-nums">
+                                        {s.v_id}
+                                    </td>
+                                    <td className="px-3 py-2 tabular-nums">
+                                        {s.zwing_row_count ?? '—'}
+                                    </td>
+                                    <td className="px-3 py-2 tabular-nums">
+                                        {s.erp_row_count ?? '—'}
+                                    </td>
                                     <td className="px-3 py-2">
-                                        <Badge variant={statusVariant[s.status]} className="capitalize">
+                                        <Badge
+                                            variant={statusVariant[s.status]}
+                                            className="capitalize"
+                                        >
                                             {s.status}
                                         </Badge>
                                     </td>
-                                    <td className="px-3 py-2 text-muted-foreground">{formatDate(s.created_at)}</td>
+                                    <td className="px-3 py-2 text-muted-foreground">
+                                        {formatDate(s.created_at)}
+                                    </td>
                                     <td className="px-3 py-2 text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="sm" className="cursor-pointer">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="cursor-pointer"
+                                                >
                                                     <MoreHorizontal className="size-4" />
-                                                    <span className="sr-only">Actions</span>
+                                                    <span className="sr-only">
+                                                        Actions
+                                                    </span>
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
@@ -168,7 +240,11 @@ export default function InvoiceReconciliationIndex({ sessions }: { sessions: Ses
                                                 </DropdownMenuItem>
                                                 {s.status === 'completed' && (
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={report.url(s.id)}>
+                                                        <Link
+                                                            href={report.url(
+                                                                s.id,
+                                                            )}
+                                                        >
                                                             <BarChart2 className="size-4" />
                                                             View report
                                                         </Link>
@@ -176,7 +252,9 @@ export default function InvoiceReconciliationIndex({ sessions }: { sessions: Ses
                                                 )}
                                                 <DropdownMenuItem
                                                     className="text-destructive focus:text-destructive"
-                                                    onSelect={() => setDeletingSession(s)}
+                                                    onSelect={() =>
+                                                        setDeletingSession(s)
+                                                    }
                                                 >
                                                     <Trash2 className="size-4" />
                                                     Delete
@@ -195,7 +273,9 @@ export default function InvoiceReconciliationIndex({ sessions }: { sessions: Ses
                 <DeleteDialog
                     session={deletingSession}
                     open={deletingSession !== null}
-                    onOpenChange={(v) => { if (!v) setDeletingSession(null); }}
+                    onOpenChange={(v) => {
+                        if (!v) setDeletingSession(null);
+                    }}
                 />
             )}
         </>

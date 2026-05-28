@@ -1,5 +1,11 @@
 import { Head, Link, useForm, usePoll } from '@inertiajs/react';
-import { ArrowLeft, CheckCircle, Trash2, XCircle } from 'lucide-react';
+import {
+    ArrowLeft,
+    CheckCircle,
+    FileText,
+    Trash2,
+    XCircle,
+} from 'lucide-react';
 import { useState } from 'react';
 import { destroy } from '@/actions/App/Http/Controllers/StockTransactionReconciliationController';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +20,13 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { dashboard } from '@/routes';
-import { index, report, show } from '@/routes/stock-transaction-reconciliation';
+import {
+    erpLogs,
+    index,
+    report,
+    show,
+    zwingLogs,
+} from '@/routes/stock-transaction-reconciliation';
 
 type SessionStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
@@ -24,18 +36,29 @@ type SessionData = {
     v_id: number;
     zwing_file_name: string | null;
     erp_file_name: string | null;
+    zwing_log_file_name: string | null;
+    erp_log_file_name: string | null;
     zwing_row_count: number | null;
     erp_row_count: number | null;
+    zwing_log_row_count: number | null;
+    erp_log_row_count: number | null;
     zwing_processed_rows: number;
     erp_processed_rows: number;
+    zwing_log_processed_rows: number;
+    erp_log_processed_rows: number;
     zwing_skipped_rows: number;
     erp_skipped_rows: number;
+    zwing_log_skipped_rows: number;
+    erp_log_skipped_rows: number;
     status: SessionStatus;
     reconciled_at: string | null;
     created_at: string;
 };
 
-const statusVariant: Record<SessionStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const statusVariant: Record<
+    SessionStatus,
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
     pending: 'secondary',
     processing: 'outline',
     completed: 'default',
@@ -58,8 +81,13 @@ function ProgressBar({
     status: SessionStatus;
 }) {
     const isActive = fileName !== null;
-    const percentage = total && total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
-    const isDone = status === 'completed' || (isActive && processed >= (total ?? 0) && total !== null);
+    const percentage =
+        total && total > 0
+            ? Math.min(100, Math.round((processed / total) * 100))
+            : 0;
+    const isDone =
+        status === 'completed' ||
+        (isActive && processed >= (total ?? 0) && total !== null);
     const isFailed = status === 'failed';
 
     return (
@@ -68,43 +96,54 @@ function ProgressBar({
                 <div>
                     <p className="font-medium">{label}</p>
                     {fileName ? (
-                        <p className="text-muted-foreground mt-0.5 font-mono text-xs">{fileName}</p>
+                        <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                            {fileName}
+                        </p>
                     ) : (
-                        <p className="text-muted-foreground mt-0.5 text-xs">No file uploaded</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            No file uploaded
+                        </p>
                     )}
                 </div>
                 {isActive && (
                     <div className="shrink-0">
-                        {isDone && !isFailed && <CheckCircle className="size-5 text-green-500" />}
-                        {isFailed && <XCircle className="size-5 text-destructive" />}
+                        {isDone && !isFailed && (
+                            <CheckCircle className="size-5 text-green-500" />
+                        )}
+                        {isFailed && (
+                            <XCircle className="size-5 text-destructive" />
+                        )}
                     </div>
                 )}
             </div>
 
             {isActive && (
                 <>
-                    <div className="bg-muted h-2.5 w-full overflow-hidden rounded-full">
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                         <div
                             className="h-full rounded-full bg-primary transition-all duration-500"
                             style={{ width: `${percentage}%` }}
                         />
                     </div>
-                    <div className="text-muted-foreground flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>
-                            {processed.toLocaleString()} / {total !== null ? total.toLocaleString() : '—'} rows
+                            {processed.toLocaleString()} /{' '}
+                            {total !== null ? total.toLocaleString() : '—'} rows
                         </span>
                         <span>{percentage}%</span>
                     </div>
                     {skipped > 0 && (
                         <p className="text-xs text-amber-600 dark:text-amber-400">
-                            {skipped.toLocaleString()} {skipped === 1 ? 'row' : 'rows'} skipped — missing or invalid data
+                            {skipped.toLocaleString()}{' '}
+                            {skipped === 1 ? 'row' : 'rows'} skipped — missing
+                            or invalid data
                         </p>
                     )}
                 </>
             )}
 
             {!isActive && (
-                <div className="bg-muted h-2.5 w-full overflow-hidden rounded-full">
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                     <div className="h-full w-0 rounded-full bg-primary" />
                 </div>
             )}
@@ -112,8 +151,16 @@ function ProgressBar({
     );
 }
 
-export default function StockTransactionReconciliationShow({ session }: { session: SessionData }) {
-    const isFinished = session.status === 'completed' || session.status === 'failed';
+export default function StockTransactionReconciliationShow({
+    session,
+}: {
+    session: SessionData;
+}) {
+    const isFinished =
+        session.status === 'completed' || session.status === 'failed';
+    const hasLogUploads =
+        session.zwing_log_file_name !== null ||
+        session.erp_log_file_name !== null;
     const [confirmOpen, setConfirmOpen] = useState(false);
     const { delete: deleteSession, processing } = useForm();
 
@@ -133,27 +180,42 @@ export default function StockTransactionReconciliationShow({ session }: { sessio
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
                         <Link href={index.url()}>
-                            <Button variant="outline" size="icon" className="mt-0.5 shrink-0">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="mt-0.5 shrink-0"
+                            >
                                 <ArrowLeft className="size-4" />
                             </Button>
                         </Link>
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
-                            {session.name}
-                            <span className="text-muted-foreground ml-2 font-mono text-base">#{session.id}</span>
-                        </h1>
-                        <p className="text-muted-foreground mt-0.5 text-xs">Vendor ID: {session.v_id}</p>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                            {session.status === 'pending' && 'Queued — waiting for the worker to start…'}
-                            {session.status === 'processing' && 'Inserting rows — this page refreshes automatically.'}
-                            {session.status === 'completed' && `Completed at ${new Date(session.reconciled_at!).toLocaleString()}`}
-                            {session.status === 'failed' && 'Processing failed. Please try uploading again.'}
-                        </p>
-                    </div>
+                        <div>
+                            <h1 className="text-xl font-semibold tracking-tight">
+                                {session.name}
+                                <span className="ml-2 font-mono text-base text-muted-foreground">
+                                    #{session.id}
+                                </span>
+                            </h1>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                Vendor ID: {session.v_id}
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {session.status === 'pending' &&
+                                    'Queued — waiting for the worker to start…'}
+                                {session.status === 'processing' &&
+                                    'Inserting rows — this page refreshes automatically.'}
+                                {session.status === 'completed' &&
+                                    `Completed at ${new Date(session.reconciled_at!).toLocaleString()}`}
+                                {session.status === 'failed' &&
+                                    'Processing failed. Please try uploading again.'}
+                            </p>
+                        </div>
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
-                        <Badge variant={statusVariant[session.status]} className="capitalize">
+                        <Badge
+                            variant={statusVariant[session.status]}
+                            className="capitalize"
+                        >
                             {session.status}
                         </Badge>
                         {session.status === 'completed' && (
@@ -164,6 +226,24 @@ export default function StockTransactionReconciliationShow({ session }: { sessio
                                 </Button>
                             </Link>
                         )}
+                        {session.status === 'completed' &&
+                            session.zwing_log_file_name && (
+                                <Link href={zwingLogs.url(session.id)}>
+                                    <Button variant="outline" size="sm">
+                                        <FileText className="size-4" />
+                                        Zwing logs
+                                    </Button>
+                                </Link>
+                            )}
+                        {session.status === 'completed' &&
+                            session.erp_log_file_name && (
+                                <Link href={erpLogs.url(session.id)}>
+                                    <Button variant="outline" size="sm">
+                                        <FileText className="size-4" />
+                                        ERP logs
+                                    </Button>
+                                </Link>
+                            )}
                         <Button
                             variant="outline"
                             size="sm"
@@ -194,22 +274,60 @@ export default function StockTransactionReconciliationShow({ session }: { sessio
                         status={session.status}
                     />
                 </div>
+
+                {hasLogUploads && (
+                    <div className="flex flex-col gap-3">
+                        <h2 className="text-sm font-medium">Log imports</h2>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <ProgressBar
+                                label="Zwing logs"
+                                fileName={session.zwing_log_file_name}
+                                processed={session.zwing_log_processed_rows}
+                                total={session.zwing_log_row_count}
+                                skipped={session.zwing_log_skipped_rows}
+                                status={session.status}
+                            />
+                            <ProgressBar
+                                label="ERP logs"
+                                fileName={session.erp_log_file_name}
+                                processed={session.erp_log_processed_rows}
+                                total={session.erp_log_row_count}
+                                skipped={session.erp_log_skipped_rows}
+                                status={session.status}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
 
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Delete reconciliation session?</DialogTitle>
+                        <DialogTitle>
+                            Delete reconciliation session?
+                        </DialogTitle>
                         <DialogDescription>
-                            This will permanently delete <span className="text-foreground font-medium">"{session.name}"</span> and all
-                            associated Zwing and ERP detail rows. This action cannot be undone.
+                            This will permanently delete{' '}
+                            <span className="font-medium text-foreground">
+                                "{session.name}"
+                            </span>{' '}
+                            and all associated Zwing and ERP detail rows. This
+                            action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={processing}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setConfirmOpen(false)}
+                            disabled={processing}
+                        >
                             Cancel
                         </Button>
-                        <Button variant="destructive" onClick={confirmDelete} disabled={processing}>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDelete}
+                            disabled={processing}
+                        >
                             {processing ? 'Deleting…' : 'Delete'}
                         </Button>
                     </DialogFooter>

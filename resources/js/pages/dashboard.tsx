@@ -1,22 +1,43 @@
 import { Head } from '@inertiajs/react';
-import { ReconciliationSummaryPanel, StatHighlight, type ReconciliationSummary } from '@/components/reconciliation-summary-panel';
+import {
+    ReconciliationSummaryPanel,
+    StatHighlight,
+    type ReconciliationSummary,
+} from '@/components/reconciliation-summary-panel';
 import Heading from '@/components/heading';
 import { dashboard } from '@/routes';
-import { create as invoiceCreate, index as invoiceIndex, report as invoiceReport } from '@/routes/invoice-reconciliation';
-import { create as stockCreate, index as stockIndex, report as stockReport } from '@/routes/stock-transaction-reconciliation';
+import {
+    create as invoiceCreate,
+    index as invoiceIndex,
+    report as invoiceReport,
+} from '@/routes/invoice-reconciliation';
+import {
+    create as stockCreate,
+    index as stockIndex,
+    report as stockReport,
+} from '@/routes/stock-transaction-reconciliation';
 
 type DashboardProps = {
     stockSummary: ReconciliationSummary | null;
     invoiceSummary: ReconciliationSummary | null;
 };
 
-export default function Dashboard({ stockSummary, invoiceSummary }: DashboardProps) {
+export default function Dashboard({
+    stockSummary,
+    invoiceSummary,
+}: DashboardProps) {
     const stockNotInErp = stockSummary?.zwing_only_percent ?? 0;
     const invoiceNotInErp = invoiceSummary?.zwing_only_percent ?? 0;
     const avgMatched =
         stockSummary && invoiceSummary
-            ? Math.round((stockSummary.matched_percent + invoiceSummary.matched_percent) / 2)
-            : (stockSummary?.matched_percent ?? invoiceSummary?.matched_percent ?? null);
+            ? Math.round(
+                  (stockSummary.matched_percent +
+                      invoiceSummary.matched_percent) /
+                      2,
+              )
+            : (stockSummary?.matched_percent ??
+              invoiceSummary?.matched_percent ??
+              null);
 
     return (
         <>
@@ -62,9 +83,11 @@ export default function Dashboard({ stockSummary, invoiceSummary }: DashboardPro
                 </div>
 
                 {avgMatched !== null && (
-                    <p className="text-muted-foreground text-center text-sm">
+                    <p className="text-center text-sm text-muted-foreground">
                         Average match rate across latest completed sessions:{' '}
-                        <span className="text-foreground font-semibold">{avgMatched}%</span>
+                        <span className="font-semibold text-foreground">
+                            {avgMatched}%
+                        </span>
                     </p>
                 )}
 
@@ -77,7 +100,10 @@ export default function Dashboard({ stockSummary, invoiceSummary }: DashboardPro
                         emptyHref={stockCreate.url()}
                         reportHref={(id) => stockReport.url(id)}
                         listHref={stockIndex.url()}
-                        mismatchLabels={{ primary: 'Qty mismatch', secondary: 'Other mismatch' }}
+                        mismatchLabels={{
+                            primary: 'Qty mismatch',
+                            secondary: 'Other mismatch',
+                        }}
                     />
                     <ReconciliationSummaryPanel
                         title="Invoice reconciliation"
@@ -87,7 +113,10 @@ export default function Dashboard({ stockSummary, invoiceSummary }: DashboardPro
                         emptyHref={invoiceCreate.url()}
                         reportHref={(id) => invoiceReport.url(id)}
                         listHref={invoiceIndex.url()}
-                        mismatchLabels={{ primary: 'Amount mismatch', secondary: 'Status mismatch' }}
+                        mismatchLabels={{
+                            primary: 'Amount mismatch',
+                            secondary: 'Status mismatch',
+                        }}
                     />
                 </div>
             </div>

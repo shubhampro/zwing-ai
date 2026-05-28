@@ -313,9 +313,6 @@ class InvoiceReconciliationController extends Controller
     }
 
     /**
-     * @return array{0: string, 1: array<int, mixed>}
-     */
-    /**
      * @return array{zwing: array<int, string>, erp: array<int, string>}
      */
     private function distinctStatusOptions(int $sessionId): array
@@ -344,6 +341,9 @@ class InvoiceReconciliationController extends Controller
         ];
     }
 
+    /**
+     * @return array{0: string, 1: array<int, mixed>}
+     */
     private function buildReportConstraints(
         string $filter,
         string $invoiceQuery,

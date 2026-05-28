@@ -118,14 +118,14 @@ final class SshTunnelManager
         fclose($pipes[0]);
         fclose($pipes[1]);
 
-        // Wait for the foreground SSH process to exit.
-        // With -f it exits quickly: code 0 after forking, non-zero on failure.
-        $exitCode = proc_close($process);
-
-        // The process has exited — read whatever it wrote to stderr.
+        // Read stderr before proc_close() — proc_close destroys all pipe resources.
         stream_set_blocking($pipes[2], false);
         $stderr = trim((string) stream_get_contents($pipes[2]));
         fclose($pipes[2]);
+
+        // Wait for the foreground SSH process to exit.
+        // With -f it exits quickly: code 0 after forking, non-zero on failure.
+        $exitCode = proc_close($process);
 
         if ($exitCode !== 0) {
             throw new RuntimeException($stderr !== '' ? $stderr : "SSH process exited with code {$exitCode}.");

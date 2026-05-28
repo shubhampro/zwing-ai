@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StockReconLogDetailRequest;
 use App\Http\Requests\StoreStockReconciliationCsvRequest;
 use App\Jobs\ParseStockReconciliationCsv;
+use App\Models\StockReconErpLog;
 use App\Models\StockReconSession;
+use App\Models\StockReconZwingLog;
 use App\Models\User;
+use App\Services\StockReconLogDetailService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,12 +65,20 @@ class StockTransactionReconciliationController extends Controller
                 'v_id',
                 'zwing_file_name',
                 'erp_file_name',
+                'zwing_log_file_name',
+                'erp_log_file_name',
                 'zwing_row_count',
                 'erp_row_count',
+                'zwing_log_row_count',
+                'erp_log_row_count',
                 'zwing_processed_rows',
                 'erp_processed_rows',
+                'zwing_log_processed_rows',
+                'erp_log_processed_rows',
                 'zwing_skipped_rows',
                 'erp_skipped_rows',
+                'zwing_log_skipped_rows',
+                'erp_log_skipped_rows',
                 'status',
                 'reconciled_at',
                 'created_at',
@@ -109,7 +122,14 @@ class StockTransactionReconciliationController extends Controller
         );
 
         return Inertia::render('stock-transaction-reconciliation/report', [
-            'session' => $stockReconSession->only(['id', 'name', 'v_id', 'status']),
+            'session' => $stockReconSession->only([
+                'id',
+                'name',
+                'v_id',
+                'status',
+                'zwing_log_file_name',
+                'erp_log_file_name',
+            ]),
             'summary' => $summary,
             'rows' => $rows,
             'pagination' => [
@@ -120,6 +140,22 @@ class StockTransactionReconciliationController extends Controller
             ],
             'filter' => $filter,
         ]);
+    }
+
+    public function reportLogDetails(
+        StockReconLogDetailRequest $request,
+        StockReconSession $stockReconSession,
+        StockReconLogDetailService $logDetailService,
+    ): JsonResponse {
+        return response()->json(
+            $logDetailService->forSku(
+                session: $stockReconSession,
+                siteCode: $request->siteCode(),
+                icode: $request->icode(),
+                batchNo: $request->batchNo(),
+                sprefcode: $request->sprefcode(),
+            ),
+        );
     }
 
     public function exportReport(Request $request, StockReconSession $stockReconSession): StreamedResponse
@@ -181,10 +217,20 @@ class StockTransactionReconciliationController extends Controller
         /** @var UploadedFile|null $erp */
         $erp = $request->file('erp_csv');
 
+        /** @var UploadedFile|null $zwingLog */
+        $zwingLog = $request->file('zwing_log_csv');
+
+        /** @var UploadedFile|null $erpLog */
+        $erpLog = $request->file('erp_log_csv');
+
         $zwingPath = '';
         $erpPath = '';
+        $zwingLogPath = '';
+        $erpLogPath = '';
         $zwingRowCount = null;
         $erpRowCount = null;
+        $zwingLogRowCount = null;
+        $erpLogRowCount = null;
 
         if ($zwing !== null) {
             $zwingPath = $zwing->store('reconciliation/zwing', 'local');
@@ -196,6 +242,16 @@ class StockTransactionReconciliationController extends Controller
             $erpRowCount = $this->countLines($erp->getRealPath());
         }
 
+        if ($zwingLog !== null) {
+            $zwingLogPath = $zwingLog->store('reconciliation/zwing-logs', 'local');
+            $zwingLogRowCount = $this->countLines($zwingLog->getRealPath());
+        }
+
+        if ($erpLog !== null) {
+            $erpLogPath = $erpLog->store('reconciliation/erp-logs', 'local');
+            $erpLogRowCount = $this->countLines($erpLog->getRealPath());
+        }
+
         /** @var User $user */
         $user = $request->user();
 
@@ -205,8 +261,12 @@ class StockTransactionReconciliationController extends Controller
             'v_id' => $request->integer('v_id'),
             'zwing_file_name' => $zwing?->getClientOriginalName(),
             'erp_file_name' => $erp?->getClientOriginalName(),
+            'zwing_log_file_name' => $zwingLog?->getClientOriginalName(),
+            'erp_log_file_name' => $erpLog?->getClientOriginalName(),
             'zwing_row_count' => $zwingRowCount,
             'erp_row_count' => $erpRowCount,
+            'zwing_log_row_count' => $zwingLogRowCount,
+            'erp_log_row_count' => $erpLogRowCount,
             'status' => 'pending',
         ]);
 
@@ -214,9 +274,87 @@ class StockTransactionReconciliationController extends Controller
             sessionId: $session->id,
             zwingPath: $zwingPath !== '' ? storage_path("app/private/{$zwingPath}") : '',
             erpPath: $erpPath !== '' ? storage_path("app/private/{$erpPath}") : '',
+            zwingLogPath: $zwingLogPath !== '' ? storage_path("app/private/{$zwingLogPath}") : '',
+            erpLogPath: $erpLogPath !== '' ? storage_path("app/private/{$erpLogPath}") : '',
         );
 
         return redirect()->route('stock-transaction-reconciliation.show', $session);
+    }
+
+    public function zwingLogs(Request $request, StockReconSession $stockReconSession): Response
+    {
+        abort_if($request->user() === null, 403);
+        abort_if($stockReconSession->user_id !== $request->user()->id, 403);
+
+        $perPage = 100;
+        $page = max(1, (int) $request->get('page', 1));
+        $search = (string) $request->get('search', '');
+
+        $query = StockReconZwingLog::where('stock_recon_session_id', $stockReconSession->id);
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search): void {
+                $q->where('icode', 'ilike', "%{$search}%")
+                    ->orWhere('site_code', 'ilike', "%{$search}%")
+                    ->orWhere('doc_no', 'ilike', "%{$search}%");
+            });
+        }
+
+        $total = $query->count();
+        $rows = $query->orderBy('id')
+            ->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->get(['id', 'v_id', 'site_code', 'icode', 'batch_no', 'sprefcode', 'doc_no', 'enttype', 'qty']);
+
+        return Inertia::render('stock-transaction-reconciliation/zwing-logs', [
+            'session' => $stockReconSession->only(['id', 'name', 'v_id', 'status']),
+            'rows' => $rows,
+            'pagination' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($total / $perPage),
+            ],
+            'search' => $search,
+        ]);
+    }
+
+    public function erpLogs(Request $request, StockReconSession $stockReconSession): Response
+    {
+        abort_if($request->user() === null, 403);
+        abort_if($stockReconSession->user_id !== $request->user()->id, 403);
+
+        $perPage = 100;
+        $page = max(1, (int) $request->get('page', 1));
+        $search = (string) $request->get('search', '');
+
+        $query = StockReconErpLog::where('stock_recon_session_id', $stockReconSession->id);
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search): void {
+                $q->where('icode', 'ilike', "%{$search}%")
+                    ->orWhere('site_code', 'ilike', "%{$search}%")
+                    ->orWhere('doc_no', 'ilike', "%{$search}%");
+            });
+        }
+
+        $total = $query->count();
+        $rows = $query->orderBy('id')
+            ->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->get(['id', 'v_id', 'site_code', 'icode', 'batch_no', 'sprefcode', 'doc_no', 'enttype', 'qty']);
+
+        return Inertia::render('stock-transaction-reconciliation/erp-logs', [
+            'session' => $stockReconSession->only(['id', 'name', 'v_id', 'status']),
+            'rows' => $rows,
+            'pagination' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($total / $perPage),
+            ],
+            'search' => $search,
+        ]);
     }
 
     public function destroy(Request $request, StockReconSession $stockReconSession): RedirectResponse

@@ -1,10 +1,10 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\DatabaseConnectionController;
-use App\Http\Controllers\DatabaseSessionContextController;
 use App\Http\Controllers\InvoiceReconciliationController;
+use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\StockTransactionReconciliationController;
+use App\Http\Controllers\TransactionCheckerController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -14,6 +14,9 @@ Route::inertia('/', 'welcome', [
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+    Route::resource('organizations', OrganizationController::class)
+        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
     Route::get('stock-transaction-reconciliation', [StockTransactionReconciliationController::class, 'index'])
         ->name('stock-transaction-reconciliation.index');
@@ -27,9 +30,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('stock-transaction-reconciliation.report');
     Route::get('stock-transaction-reconciliation/{stockReconSession}/report/export', [StockTransactionReconciliationController::class, 'exportReport'])
         ->name('stock-transaction-reconciliation.report.export');
+    Route::get('stock-transaction-reconciliation/{stockReconSession}/report/log-details', [StockTransactionReconciliationController::class, 'reportLogDetails'])
+        ->name('stock-transaction-reconciliation.report.log-details');
+    Route::get('stock-transaction-reconciliation/{stockReconSession}/zwing-logs', [StockTransactionReconciliationController::class, 'zwingLogs'])
+        ->name('stock-transaction-reconciliation.zwing-logs');
+    Route::get('stock-transaction-reconciliation/{stockReconSession}/erp-logs', [StockTransactionReconciliationController::class, 'erpLogs'])
+        ->name('stock-transaction-reconciliation.erp-logs');
     Route::delete('stock-transaction-reconciliation/{stockReconSession}', [StockTransactionReconciliationController::class, 'destroy'])
         ->name('stock-transaction-reconciliation.destroy');
 
+    Route::get('transaction-checker', [TransactionCheckerController::class, 'index'])
+        ->name('transaction-checker.index');
+    Route::get('transaction-checker/databases', [TransactionCheckerController::class, 'databases'])
+        ->name('transaction-checker.databases');
+    Route::post('transaction-checker/check', [TransactionCheckerController::class, 'check'])
+        ->name('transaction-checker.check');
+    Route::delete('transaction-checker/sessions/{session}', [TransactionCheckerController::class, 'destroySession'])
+        ->name('transaction-checker.sessions.destroy');
     Route::get('invoice-reconciliation', [InvoiceReconciliationController::class, 'index'])
         ->name('invoice-reconciliation.index');
     Route::get('invoice-reconciliation/create', [InvoiceReconciliationController::class, 'create'])
@@ -44,19 +61,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('invoice-reconciliation.report.export');
     Route::delete('invoice-reconciliation/{invoiceReconSession}', [InvoiceReconciliationController::class, 'destroy'])
         ->name('invoice-reconciliation.destroy');
-
-    Route::get('database-session-context/databases', [DatabaseSessionContextController::class, 'databases'])
-        ->name('database-session-context.databases');
-    Route::put('database-session-context', [DatabaseSessionContextController::class, 'update'])
-        ->name('database-session-context.update');
-
-    Route::get('database-connections/activity-logs', [DatabaseConnectionController::class, 'activityLogs'])
-        ->name('database-connections.activity-logs');
-
-    Route::post('database-connections/test', [DatabaseConnectionController::class, 'testConnection'])
-        ->name('database-connections.test');
-
-    Route::resource('database-connections', DatabaseConnectionController::class)->except(['show', 'destroy']);
 });
 
 require __DIR__.'/settings.php';

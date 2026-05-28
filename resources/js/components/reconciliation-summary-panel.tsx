@@ -1,7 +1,14 @@
 import { Link } from '@inertiajs/react';
 import { ArrowLeftRight, BarChart2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 export type ReconciliationSummary = {
@@ -48,10 +55,19 @@ function formatDate(iso: string | null): string {
 function MatchRing({ percent, label }: { percent: number; label: string }) {
     const clamped = Math.min(100, Math.max(0, percent));
     const ringColor =
-        clamped >= 90 ? 'text-green-500' : clamped >= 70 ? 'text-amber-500' : 'text-destructive';
+        clamped >= 90
+            ? 'text-green-500'
+            : clamped >= 70
+              ? 'text-amber-500'
+              : 'text-destructive';
 
     return (
-        <div className={cn('relative flex size-28 shrink-0 items-center justify-center', ringColor)}>
+        <div
+            className={cn(
+                'relative flex size-28 shrink-0 items-center justify-center',
+                ringColor,
+            )}
+        >
             <div
                 className="absolute inset-0 rounded-full"
                 style={{
@@ -60,8 +76,14 @@ function MatchRing({ percent, label }: { percent: number; label: string }) {
                 aria-hidden
             />
             <div className="absolute inset-[6px] flex flex-col items-center justify-center rounded-full bg-card">
-                <span className={cn('text-2xl font-bold tabular-nums', ringColor)}>{clamped}%</span>
-                <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">{label}</span>
+                <span
+                    className={cn('text-2xl font-bold tabular-nums', ringColor)}
+                >
+                    {clamped}%
+                </span>
+                <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                    {label}
+                </span>
             </div>
         </div>
     );
@@ -71,7 +93,7 @@ function SegmentBar({ segments }: { segments: Segment[] }) {
     const withData = segments.filter((s) => s.percent > 0);
 
     if (withData.length === 0) {
-        return <div className="bg-muted h-3 w-full rounded-full" />;
+        return <div className="h-3 w-full rounded-full bg-muted" />;
     }
 
     return (
@@ -92,14 +114,24 @@ function SegmentLegend({ segments }: { segments: Segment[] }) {
     return (
         <ul className="grid gap-2 sm:grid-cols-2">
             {segments.map((segment) => (
-                <li key={segment.key} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-muted-foreground flex items-center gap-2">
-                        <span className={cn('size-2.5 shrink-0 rounded-full', segment.dotClass)} />
+                <li
+                    key={segment.key}
+                    className="flex items-center justify-between gap-2 text-sm"
+                >
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                        <span
+                            className={cn(
+                                'size-2.5 shrink-0 rounded-full',
+                                segment.dotClass,
+                            )}
+                        />
                         {segment.label}
                     </span>
-                    <span className="tabular-nums font-medium">
+                    <span className="font-medium tabular-nums">
                         {segment.count.toLocaleString()}
-                        <span className="text-muted-foreground ms-1 font-normal">({segment.percent}%)</span>
+                        <span className="ms-1 font-normal text-muted-foreground">
+                            ({segment.percent}%)
+                        </span>
                     </span>
                 </li>
             ))}
@@ -135,8 +167,8 @@ export function ReconciliationSummaryPanel({
             <Card className="h-full border-dashed">
                 <CardHeader>
                     <div className="flex items-center gap-2">
-                        <div className="bg-muted flex size-9 items-center justify-center rounded-lg">
-                            <Icon className="text-muted-foreground size-4" />
+                        <div className="flex size-9 items-center justify-center rounded-lg bg-muted">
+                            <Icon className="size-4 text-muted-foreground" />
                         </div>
                         <div>
                             <CardTitle>{title}</CardTitle>
@@ -145,8 +177,9 @@ export function ReconciliationSummaryPanel({
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground text-sm">
-                        No completed reconciliation yet. Upload Zwing and ERP CSVs to see match percentages here.
+                    <p className="text-sm text-muted-foreground">
+                        No completed reconciliation yet. Upload Zwing and ERP
+                        CSVs to see match percentages here.
                     </p>
                 </CardContent>
                 <CardFooter>
@@ -209,14 +242,19 @@ export function ReconciliationSummaryPanel({
         <Card className="h-full">
             <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
                 <div className="flex items-start gap-3">
-                    <div className="bg-primary/10 flex size-10 shrink-0 items-center justify-center rounded-lg">
-                        <Icon className="text-primary size-5" />
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <Icon className="size-5 text-primary" />
                     </div>
                     <div>
                         <CardTitle>{title}</CardTitle>
-                        <CardDescription className="mt-1">{description}</CardDescription>
-                        <p className="text-muted-foreground mt-2 text-xs">
-                            Latest: <span className="text-foreground font-medium">{summary.session.name}</span>
+                        <CardDescription className="mt-1">
+                            {description}
+                        </CardDescription>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                            Latest:{' '}
+                            <span className="font-medium text-foreground">
+                                {summary.session.name}
+                            </span>
                             {' · '}
                             Vendor {summary.session.v_id}
                             {' · '}
@@ -229,8 +267,12 @@ export function ReconciliationSummaryPanel({
             <CardContent className="flex flex-col gap-5">
                 <div>
                     <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Distribution</span>
-                        <span className="font-medium tabular-nums">{summary.total.toLocaleString()} rows compared</span>
+                        <span className="text-muted-foreground">
+                            Distribution
+                        </span>
+                        <span className="font-medium tabular-nums">
+                            {summary.total.toLocaleString()} rows compared
+                        </span>
                     </div>
                     <SegmentBar segments={segments} />
                 </div>
@@ -258,7 +300,12 @@ type StatHighlightProps = {
     tone: 'green' | 'amber' | 'blue';
 };
 
-export function StatHighlight({ label, percent, sublabel, tone }: StatHighlightProps) {
+export function StatHighlight({
+    label,
+    percent,
+    sublabel,
+    tone,
+}: StatHighlightProps) {
     const toneClasses = {
         green: 'from-green-500/15 to-green-500/5 text-green-700 dark:text-green-400',
         amber: 'from-amber-500/15 to-amber-500/5 text-amber-700 dark:text-amber-400',
@@ -268,9 +315,13 @@ export function StatHighlight({ label, percent, sublabel, tone }: StatHighlightP
     return (
         <Card className={cn('bg-gradient-to-br py-5', toneClasses[tone])}>
             <CardContent className="px-6">
-                <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{label}</p>
-                <p className="mt-1 text-4xl font-bold tabular-nums tracking-tight">{percent}%</p>
-                <p className="text-muted-foreground mt-1 text-sm">{sublabel}</p>
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    {label}
+                </p>
+                <p className="mt-1 text-4xl font-bold tracking-tight tabular-nums">
+                    {percent}%
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">{sublabel}</p>
             </CardContent>
         </Card>
     );

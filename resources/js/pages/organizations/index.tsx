@@ -1,9 +1,8 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { BarChart2, Eye, MoreHorizontal, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { destroy } from '@/actions/App/Http/Controllers/StockTransactionReconciliationController';
+import { destroy } from '@/actions/App/Http/Controllers/OrganizationController';
 import Heading from '@/components/heading';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -20,61 +19,29 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { dashboard } from '@/routes';
-import {
-    create,
-    index,
-    report,
-    show,
-} from '@/routes/stock-transaction-reconciliation';
+import { create, edit, index } from '@/routes/organizations';
 
-type SessionStatus = 'pending' | 'processing' | 'completed' | 'failed';
-
-type SessionRow = {
+type Organization = {
     id: number;
     name: string;
-    v_id: number;
-    zwing_file_name: string | null;
-    erp_file_name: string | null;
-    zwing_row_count: number | null;
-    erp_row_count: number | null;
-    status: SessionStatus;
-    reconciled_at: string | null;
+    ba_code: string;
+    vendor_id: number;
     created_at: string;
 };
 
-const statusVariant: Record<
-    SessionStatus,
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    pending: 'secondary',
-    processing: 'outline',
-    completed: 'default',
-    failed: 'destructive',
-};
-
-function formatDate(iso: string | null): string {
-    if (!iso) {
-        return '—';
-    }
-    return new Date(iso).toLocaleString(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    });
-}
-
 function DeleteDialog({
-    session,
+    organization,
     open,
     onOpenChange,
 }: {
-    session: SessionRow;
+    organization: Organization;
     open: boolean;
     onOpenChange: (v: boolean) => void;
 }) {
-    const { delete: deleteSession, processing } = useForm();
+    const { delete: deleteOrg, processing } = useForm();
 
     function confirm() {
-        deleteSession(destroy.url(session.id), {
+        deleteOrg(destroy.url(organization.id), {
             onSuccess: () => onOpenChange(false),
         });
     }
@@ -83,14 +50,13 @@ function DeleteDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Delete reconciliation session?</DialogTitle>
+                    <DialogTitle>Delete organization?</DialogTitle>
                     <DialogDescription>
                         This will permanently delete{' '}
                         <span className="font-medium text-foreground">
-                            "{session.name}"
-                        </span>{' '}
-                        and all associated Zwing and ERP detail rows. This
-                        action cannot be undone.
+                            "{organization.name}"
+                        </span>
+                        . This action cannot be undone.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
@@ -114,47 +80,39 @@ function DeleteDialog({
     );
 }
 
-export default function StockTransactionReconciliationIndex({
-    sessions,
+export default function OrganizationsIndex({
+    organizations,
 }: {
-    sessions: SessionRow[];
+    organizations: Organization[];
 }) {
-    const [deletingSession, setDeletingSession] = useState<SessionRow | null>(
-        null,
-    );
+    const [deletingOrg, setDeletingOrg] = useState<Organization | null>(null);
 
     return (
         <>
-            <Head title="Stock–transaction reconciliation" />
+            <Head title="Organizations" />
 
             <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <Heading
-                        title="Stock–transaction reconciliation"
-                        description="Upload Zwing and ERP CSVs to reconcile stock data. Each upload creates a new session."
+                        title="Organizations"
+                        description="Manage organizations, BA codes and vendor mappings."
                     />
                     <Button size="sm" asChild>
-                        <Link href={create.url()}>New reconciliation</Link>
+                        <Link href={create.url()}>New organization</Link>
                     </Button>
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
-                    <table className="w-full min-w-[640px] text-left text-sm">
+                    <table className="w-full min-w-[560px] text-left text-sm">
                         <thead className="bg-muted/50 text-muted-foreground">
                             <tr>
                                 <th className="px-3 py-2 font-medium">#</th>
                                 <th className="px-3 py-2 font-medium">Name</th>
                                 <th className="px-3 py-2 font-medium">
+                                    BA Code
+                                </th>
+                                <th className="px-3 py-2 font-medium">
                                     Vendor ID
-                                </th>
-                                <th className="px-3 py-2 font-medium">
-                                    Zwing rows
-                                </th>
-                                <th className="px-3 py-2 font-medium">
-                                    ERP rows
-                                </th>
-                                <th className="px-3 py-2 font-medium">
-                                    Status
                                 </th>
                                 <th className="px-3 py-2 font-medium">
                                     Created at
@@ -163,63 +121,46 @@ export default function StockTransactionReconciliationIndex({
                             </tr>
                         </thead>
                         <tbody>
-                            {sessions.length === 0 && (
+                            {organizations.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={8}
+                                        colSpan={6}
                                         className="px-3 py-8 text-center text-muted-foreground"
                                     >
-                                        No reconciliation sessions found.{' '}
+                                        No organizations found.{' '}
                                         <Link
                                             href={create.url()}
                                             className="text-foreground underline"
                                         >
-                                            Start a new reconciliation
-                                        </Link>{' '}
-                                        by uploading Zwing and/or ERP CSV files.
+                                            Create one
+                                        </Link>
+                                        .
                                     </td>
                                 </tr>
                             )}
-                            {sessions.map((s) => (
+                            {organizations.map((org) => (
                                 <tr
-                                    key={s.id}
+                                    key={org.id}
                                     className="border-t border-sidebar-border/70 dark:border-sidebar-border"
                                 >
                                     <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                                        <Link
-                                            href={show.url(s.id)}
-                                            className="hover:underline"
-                                        >
-                                            {s.id}
-                                        </Link>
+                                        {org.id}
                                     </td>
                                     <td className="px-3 py-2 font-medium">
-                                        <Link
-                                            href={show.url(s.id)}
-                                            className="hover:underline"
-                                        >
-                                            {s.name}
-                                        </Link>
+                                        {org.name}
+                                    </td>
+                                    <td className="px-3 py-2 font-mono text-xs">
+                                        {org.ba_code}
                                     </td>
                                     <td className="px-3 py-2 tabular-nums">
-                                        {s.v_id}
-                                    </td>
-                                    <td className="px-3 py-2 tabular-nums">
-                                        {s.zwing_row_count ?? '—'}
-                                    </td>
-                                    <td className="px-3 py-2 tabular-nums">
-                                        {s.erp_row_count ?? '—'}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                        <Badge
-                                            variant={statusVariant[s.status]}
-                                            className="capitalize"
-                                        >
-                                            {s.status}
-                                        </Badge>
+                                        {org.vendor_id}
                                     </td>
                                     <td className="px-3 py-2 text-muted-foreground">
-                                        {formatDate(s.created_at)}
+                                        {new Date(
+                                            org.created_at,
+                                        ).toLocaleDateString(undefined, {
+                                            dateStyle: 'medium',
+                                        })}
                                     </td>
                                     <td className="px-3 py-2 text-right">
                                         <DropdownMenu>
@@ -237,27 +178,17 @@ export default function StockTransactionReconciliationIndex({
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuItem asChild>
-                                                    <Link href={show.url(s.id)}>
-                                                        <Eye className="size-4" />
-                                                        Show
+                                                    <Link
+                                                        href={edit.url(org.id)}
+                                                    >
+                                                        <Pencil className="size-4" />
+                                                        Edit
                                                     </Link>
                                                 </DropdownMenuItem>
-                                                {s.status === 'completed' && (
-                                                    <DropdownMenuItem asChild>
-                                                        <Link
-                                                            href={report.url(
-                                                                s.id,
-                                                            )}
-                                                        >
-                                                            <BarChart2 className="size-4" />
-                                                            View report
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                )}
                                                 <DropdownMenuItem
                                                     className="text-destructive focus:text-destructive"
                                                     onSelect={() =>
-                                                        setDeletingSession(s)
+                                                        setDeletingOrg(org)
                                                     }
                                                 >
                                                     <Trash2 className="size-4" />
@@ -273,12 +204,12 @@ export default function StockTransactionReconciliationIndex({
                 </div>
             </div>
 
-            {deletingSession && (
+            {deletingOrg && (
                 <DeleteDialog
-                    session={deletingSession}
-                    open={deletingSession !== null}
+                    organization={deletingOrg}
+                    open={deletingOrg !== null}
                     onOpenChange={(v) => {
-                        if (!v) setDeletingSession(null);
+                        if (!v) setDeletingOrg(null);
                     }}
                 />
             )}
@@ -286,9 +217,9 @@ export default function StockTransactionReconciliationIndex({
     );
 }
 
-StockTransactionReconciliationIndex.layout = {
+OrganizationsIndex.layout = {
     breadcrumbs: [
         { title: 'Dashboard', href: dashboard() },
-        { title: 'Stock reconciliation', href: index.url() },
+        { title: 'Organizations', href: index.url() },
     ],
 };

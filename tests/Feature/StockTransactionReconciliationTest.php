@@ -238,7 +238,7 @@ test('csv upload validates file type', function () {
         ->assertSessionHasErrors('zwing_csv');
 });
 
-test('csv upload requires both files', function () {
+test('csv upload requires at least one stock file', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
@@ -246,5 +246,84 @@ test('csv upload requires both files', function () {
             'name' => 'Test session',
             'v_id' => 1,
         ])
-        ->assertSessionHasErrors(['zwing_csv', 'erp_csv']);
+        ->assertSessionHasErrors('zwing_csv');
+});
+
+test('csv upload accepts only zwing stock file', function () {
+    Queue::fake();
+    Storage::fake('local');
+
+    $user = User::factory()->create();
+    $csvContent = "batch_no,barcode,icode,site_code,sprefcode,stock_point_name,qty\nB1,A1,I1,SC1,SPR1,Store1,10\n";
+    $zwingFile = UploadedFile::fake()->createWithContent('zwing.csv', $csvContent);
+
+    $this->actingAs($user)
+        ->post(route('stock-transaction-reconciliation.csv'), [
+            'name' => 'Zwing only session',
+            'v_id' => 147,
+            'zwing_csv' => $zwingFile,
+        ])
+        ->assertRedirect();
+
+    $session = StockReconSession::where('user_id', $user->id)->firstOrFail();
+    expect($session->zwing_file_name)->toBe('zwing.csv');
+    expect($session->erp_file_name)->toBeNull();
+
+    Queue::assertPushed(ParseStockReconciliationCsv::class);
+});
+
+test('csv upload accepts optional log files', function () {
+    Queue::fake();
+    Storage::fake('local');
+
+    $user = User::factory()->create();
+    $stockCsv = "batch_no,barcode,icode,site_code,sprefcode,stock_point_name,qty\nB1,A1,I1,SC1,SPR1,Store1,10\n";
+    $logCsv = "site_code,icode,batch_no,sprefcode,doc_no,enttype,qty\nSC1,I1,B1,SPR1,D1,GRN,10\n";
+
+    $this->actingAs($user)
+        ->post(route('stock-transaction-reconciliation.csv'), [
+            'name' => 'With logs session',
+            'v_id' => 147,
+            'zwing_csv' => UploadedFile::fake()->createWithContent('zwing.csv', $stockCsv),
+            'zwing_log_csv' => UploadedFile::fake()->createWithContent('zwing-logs.csv', $logCsv),
+        ])
+        ->assertRedirect();
+
+    $session = StockReconSession::where('user_id', $user->id)->firstOrFail();
+    expect($session->zwing_log_file_name)->toBe('zwing-logs.csv');
+    expect($session->zwing_log_row_count)->toBe(1);
+
+    Queue::assertPushed(ParseStockReconciliationCsv::class, fn ($job) => $job->zwingLogPath !== '');
+});
+
+test('csv upload rejects log file missing required columns', function () {
+    $user = User::factory()->create();
+    $stockCsv = "batch_no,barcode,icode,site_code,sprefcode,stock_point_name,qty\nB1,A1,I1,SC1,SPR1,Store1,10\n";
+    $badLogCsv = "site_code,doc_no,qty\nSC1,D1,1\n";
+
+    $this->actingAs($user)
+        ->post(route('stock-transaction-reconciliation.csv'), [
+            'name' => 'Bad log session',
+            'v_id' => 1,
+            'zwing_csv' => UploadedFile::fake()->createWithContent('zwing.csv', $stockCsv),
+            'zwing_log_csv' => UploadedFile::fake()->createWithContent('bad-log.csv', $badLogCsv),
+        ])
+        ->assertSessionHasErrors('zwing_log_csv');
+});
+
+test('authenticated users can view zwing logs page', function () {
+    $user = User::factory()->create();
+    $session = StockReconSession::create([
+        'user_id' => $user->id,
+        'name' => 'logs-session',
+        'v_id' => 1,
+        'status' => 'completed',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('stock-transaction-reconciliation.zwing-logs', $session))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('stock-transaction-reconciliation/zwing-logs')
+            ->has('rows'));
 });

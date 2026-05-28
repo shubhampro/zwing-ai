@@ -1,5 +1,11 @@
 import { Head, Link, useForm, usePoll } from '@inertiajs/react';
-import { ArrowLeft, BarChart2, CheckCircle, Trash2, XCircle } from 'lucide-react';
+import {
+    ArrowLeft,
+    BarChart2,
+    CheckCircle,
+    Trash2,
+    XCircle,
+} from 'lucide-react';
 import { useState } from 'react';
 import { destroy } from '@/actions/App/Http/Controllers/InvoiceReconciliationController';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +40,10 @@ type SessionData = {
     created_at: string;
 };
 
-const statusVariant: Record<SessionStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const statusVariant: Record<
+    SessionStatus,
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
     pending: 'secondary',
     processing: 'outline',
     completed: 'default',
@@ -57,8 +66,13 @@ function ProgressBar({
     status: SessionStatus;
 }) {
     const isActive = fileName !== null;
-    const percentage = total && total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
-    const isDone = status === 'completed' || (isActive && processed >= (total ?? 0) && total !== null);
+    const percentage =
+        total && total > 0
+            ? Math.min(100, Math.round((processed / total) * 100))
+            : 0;
+    const isDone =
+        status === 'completed' ||
+        (isActive && processed >= (total ?? 0) && total !== null);
     const isFailed = status === 'failed';
 
     return (
@@ -67,43 +81,54 @@ function ProgressBar({
                 <div>
                     <p className="font-medium">{label}</p>
                     {fileName ? (
-                        <p className="text-muted-foreground mt-0.5 font-mono text-xs">{fileName}</p>
+                        <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                            {fileName}
+                        </p>
                     ) : (
-                        <p className="text-muted-foreground mt-0.5 text-xs">No file uploaded</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            No file uploaded
+                        </p>
                     )}
                 </div>
                 {isActive && (
                     <div className="shrink-0">
-                        {isDone && !isFailed && <CheckCircle className="size-5 text-green-500" />}
-                        {isFailed && <XCircle className="size-5 text-destructive" />}
+                        {isDone && !isFailed && (
+                            <CheckCircle className="size-5 text-green-500" />
+                        )}
+                        {isFailed && (
+                            <XCircle className="size-5 text-destructive" />
+                        )}
                     </div>
                 )}
             </div>
 
             {isActive && (
                 <>
-                    <div className="bg-muted h-2.5 w-full overflow-hidden rounded-full">
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                         <div
                             className="h-full rounded-full bg-primary transition-all duration-500"
                             style={{ width: `${percentage}%` }}
                         />
                     </div>
-                    <div className="text-muted-foreground flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>
-                            {processed.toLocaleString()} / {total !== null ? total.toLocaleString() : '—'} rows
+                            {processed.toLocaleString()} /{' '}
+                            {total !== null ? total.toLocaleString() : '—'} rows
                         </span>
                         <span>{percentage}%</span>
                     </div>
                     {skipped > 0 && (
                         <p className="text-xs text-amber-600 dark:text-amber-400">
-                            {skipped.toLocaleString()} {skipped === 1 ? 'row' : 'rows'} skipped — missing or invalid data
+                            {skipped.toLocaleString()}{' '}
+                            {skipped === 1 ? 'row' : 'rows'} skipped — missing
+                            or invalid data
                         </p>
                     )}
                 </>
             )}
 
             {!isActive && (
-                <div className="bg-muted h-2.5 w-full overflow-hidden rounded-full">
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                     <div className="h-full w-0 rounded-full bg-primary" />
                 </div>
             )}
@@ -111,8 +136,13 @@ function ProgressBar({
     );
 }
 
-export default function InvoiceReconciliationShow({ session }: { session: SessionData }) {
-    const isFinished = session.status === 'completed' || session.status === 'failed';
+export default function InvoiceReconciliationShow({
+    session,
+}: {
+    session: SessionData;
+}) {
+    const isFinished =
+        session.status === 'completed' || session.status === 'failed';
     const [confirmOpen, setConfirmOpen] = useState(false);
     const { delete: deleteSession, processing } = useForm();
 
@@ -132,27 +162,42 @@ export default function InvoiceReconciliationShow({ session }: { session: Sessio
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
                         <Link href={index.url()}>
-                            <Button variant="outline" size="icon" className="mt-0.5 shrink-0">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="mt-0.5 shrink-0"
+                            >
                                 <ArrowLeft className="size-4" />
                             </Button>
                         </Link>
                         <div>
                             <h1 className="text-xl font-semibold tracking-tight">
                                 {session.name}
-                                <span className="text-muted-foreground ml-2 font-mono text-base">#{session.id}</span>
+                                <span className="ml-2 font-mono text-base text-muted-foreground">
+                                    #{session.id}
+                                </span>
                             </h1>
-                            <p className="text-muted-foreground mt-0.5 text-xs">Vendor ID: {session.v_id}</p>
-                            <p className="text-muted-foreground mt-1 text-sm">
-                                {session.status === 'pending' && 'Queued — waiting for the worker to start…'}
-                                {session.status === 'processing' && 'Inserting rows — this page refreshes automatically.'}
-                                {session.status === 'completed' && `Completed at ${new Date(session.reconciled_at!).toLocaleString()}`}
-                                {session.status === 'failed' && 'Processing failed. Please try uploading again.'}
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                Vendor ID: {session.v_id}
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {session.status === 'pending' &&
+                                    'Queued — waiting for the worker to start…'}
+                                {session.status === 'processing' &&
+                                    'Inserting rows — this page refreshes automatically.'}
+                                {session.status === 'completed' &&
+                                    `Completed at ${new Date(session.reconciled_at!).toLocaleString()}`}
+                                {session.status === 'failed' &&
+                                    'Processing failed. Please try uploading again.'}
                             </p>
                         </div>
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
-                        <Badge variant={statusVariant[session.status]} className="capitalize">
+                        <Badge
+                            variant={statusVariant[session.status]}
+                            className="capitalize"
+                        >
                             {session.status}
                         </Badge>
                         {session.status === 'completed' && (
@@ -198,17 +243,31 @@ export default function InvoiceReconciliationShow({ session }: { session: Sessio
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Delete reconciliation session?</DialogTitle>
+                        <DialogTitle>
+                            Delete reconciliation session?
+                        </DialogTitle>
                         <DialogDescription>
-                            This will permanently delete <span className="text-foreground font-medium">"{session.name}"</span> and all
-                            associated Zwing and ERP invoice rows. This action cannot be undone.
+                            This will permanently delete{' '}
+                            <span className="font-medium text-foreground">
+                                "{session.name}"
+                            </span>{' '}
+                            and all associated Zwing and ERP invoice rows. This
+                            action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={processing}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setConfirmOpen(false)}
+                            disabled={processing}
+                        >
                             Cancel
                         </Button>
-                        <Button variant="destructive" onClick={confirmDelete} disabled={processing}>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDelete}
+                            disabled={processing}
+                        >
                             {processing ? 'Deleting…' : 'Delete'}
                         </Button>
                     </DialogFooter>
