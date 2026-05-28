@@ -1,5 +1,10 @@
 import { Link } from '@inertiajs/react';
-import { ArrowLeftRight, Building2, ClipboardCheck, LayoutGrid } from 'lucide-react';
+import {
+    ArrowLeftRight,
+    Building2,
+    ClipboardCheck,
+    LayoutGrid,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';

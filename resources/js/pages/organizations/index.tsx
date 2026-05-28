@@ -19,11 +19,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { dashboard } from '@/routes';
-import {
-    create,
-    edit,
-    index,
-} from '@/routes/organizations';
+import { create, edit, index } from '@/routes/organizations';
 
 type Organization = {
     id: number;
@@ -160,10 +156,11 @@ export default function OrganizationsIndex({
                                         {org.vendor_id}
                                     </td>
                                     <td className="px-3 py-2 text-muted-foreground">
-                                        {new Date(org.created_at).toLocaleDateString(
-                                            undefined,
-                                            { dateStyle: 'medium' },
-                                        )}
+                                        {new Date(
+                                            org.created_at,
+                                        ).toLocaleDateString(undefined, {
+                                            dateStyle: 'medium',
+                                        })}
                                     </td>
                                     <td className="px-3 py-2 text-right">
                                         <DropdownMenu>

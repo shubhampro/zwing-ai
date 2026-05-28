@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\StockReconSession;
+use App\Support\Sprefcode;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,8 @@ class ParseStockReconciliationCsv implements ShouldQueue
         public readonly int $sessionId,
         public readonly string $zwingPath,
         public readonly string $erpPath,
+        public readonly string $zwingLogPath = '',
+        public readonly string $erpLogPath = '',
     ) {}
 
     public function handle(): void
@@ -45,6 +48,14 @@ class ParseStockReconciliationCsv implements ShouldQueue
                 progressColumn: 'erp_processed_rows',
                 skippedColumn: 'erp_skipped_rows',
             );
+        }
+
+        if ($this->zwingLogPath !== '' || $this->erpLogPath !== '') {
+            (new ParseStockReconciliationLogCsv(
+                sessionId: $this->sessionId,
+                zwingLogPath: $this->zwingLogPath,
+                erpLogPath: $this->erpLogPath,
+            ))->handle();
         }
 
         $session->update([
@@ -99,7 +110,7 @@ class ParseStockReconciliationCsv implements ShouldQueue
                 'icode' => trim((string) $record['icode']),
                 'stock_point_name' => trim((string) $record['stock_point_name']),
                 'site_code' => trim((string) $record['site_code']),
-                'sprefcode' => $this->parseSprefcode(trim((string) $record['sprefcode'])),
+                'sprefcode' => Sprefcode::parse(trim((string) $record['sprefcode'])),
                 'qty' => (float) $record['qty'],
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -126,19 +137,6 @@ class ParseStockReconciliationCsv implements ShouldQueue
         if ($skippedChunk > 0) {
             $session->increment($skippedColumn, $skippedChunk);
         }
-    }
-
-    /**
-     * Extract the numeric suffix from a sprefcode value.
-     * e.g. "HOAD1695-1" → 1, "42" → 42, "ABC-XYZ-5" → 5.
-     * Returns 0 when no numeric part is found.
-     */
-    private function parseSprefcode(string $value): int
-    {
-        $parts = explode('-', $value);
-        $last = trim((string) end($parts));
-
-        return is_numeric($last) ? (int) $last : 0;
     }
 
     /**

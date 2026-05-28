@@ -28,6 +28,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('stock-transaction-reconciliation.report');
     Route::get('stock-transaction-reconciliation/{stockReconSession}/report/export', [StockTransactionReconciliationController::class, 'exportReport'])
         ->name('stock-transaction-reconciliation.report.export');
+    Route::get('stock-transaction-reconciliation/{stockReconSession}/report/log-details', [StockTransactionReconciliationController::class, 'reportLogDetails'])
+        ->name('stock-transaction-reconciliation.report.log-details');
+    Route::get('stock-transaction-reconciliation/{stockReconSession}/zwing-logs', [StockTransactionReconciliationController::class, 'zwingLogs'])
+        ->name('stock-transaction-reconciliation.zwing-logs');
+    Route::get('stock-transaction-reconciliation/{stockReconSession}/erp-logs', [StockTransactionReconciliationController::class, 'erpLogs'])
+        ->name('stock-transaction-reconciliation.erp-logs');
     Route::delete('stock-transaction-reconciliation/{stockReconSession}', [StockTransactionReconciliationController::class, 'destroy'])
         ->name('stock-transaction-reconciliation.destroy');
 

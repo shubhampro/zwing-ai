@@ -1,5 +1,11 @@
 import { Head, Link, useForm, usePoll } from '@inertiajs/react';
-import { ArrowLeft, CheckCircle, Trash2, XCircle } from 'lucide-react';
+import {
+    ArrowLeft,
+    CheckCircle,
+    FileText,
+    Trash2,
+    XCircle,
+} from 'lucide-react';
 import { useState } from 'react';
 import { destroy } from '@/actions/App/Http/Controllers/StockTransactionReconciliationController';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +20,13 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { dashboard } from '@/routes';
-import { index, report, show } from '@/routes/stock-transaction-reconciliation';
+import {
+    erpLogs,
+    index,
+    report,
+    show,
+    zwingLogs,
+} from '@/routes/stock-transaction-reconciliation';
 
 type SessionStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
@@ -24,12 +36,20 @@ type SessionData = {
     v_id: number;
     zwing_file_name: string | null;
     erp_file_name: string | null;
+    zwing_log_file_name: string | null;
+    erp_log_file_name: string | null;
     zwing_row_count: number | null;
     erp_row_count: number | null;
+    zwing_log_row_count: number | null;
+    erp_log_row_count: number | null;
     zwing_processed_rows: number;
     erp_processed_rows: number;
+    zwing_log_processed_rows: number;
+    erp_log_processed_rows: number;
     zwing_skipped_rows: number;
     erp_skipped_rows: number;
+    zwing_log_skipped_rows: number;
+    erp_log_skipped_rows: number;
     status: SessionStatus;
     reconciled_at: string | null;
     created_at: string;
@@ -138,6 +158,9 @@ export default function StockTransactionReconciliationShow({
 }) {
     const isFinished =
         session.status === 'completed' || session.status === 'failed';
+    const hasLogUploads =
+        session.zwing_log_file_name !== null ||
+        session.erp_log_file_name !== null;
     const [confirmOpen, setConfirmOpen] = useState(false);
     const { delete: deleteSession, processing } = useForm();
 
@@ -203,6 +226,24 @@ export default function StockTransactionReconciliationShow({
                                 </Button>
                             </Link>
                         )}
+                        {session.status === 'completed' &&
+                            session.zwing_log_file_name && (
+                                <Link href={zwingLogs.url(session.id)}>
+                                    <Button variant="outline" size="sm">
+                                        <FileText className="size-4" />
+                                        Zwing logs
+                                    </Button>
+                                </Link>
+                            )}
+                        {session.status === 'completed' &&
+                            session.erp_log_file_name && (
+                                <Link href={erpLogs.url(session.id)}>
+                                    <Button variant="outline" size="sm">
+                                        <FileText className="size-4" />
+                                        ERP logs
+                                    </Button>
+                                </Link>
+                            )}
                         <Button
                             variant="outline"
                             size="sm"
@@ -233,6 +274,30 @@ export default function StockTransactionReconciliationShow({
                         status={session.status}
                     />
                 </div>
+
+                {hasLogUploads && (
+                    <div className="flex flex-col gap-3">
+                        <h2 className="text-sm font-medium">Log imports</h2>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <ProgressBar
+                                label="Zwing logs"
+                                fileName={session.zwing_log_file_name}
+                                processed={session.zwing_log_processed_rows}
+                                total={session.zwing_log_row_count}
+                                skipped={session.zwing_log_skipped_rows}
+                                status={session.status}
+                            />
+                            <ProgressBar
+                                label="ERP logs"
+                                fileName={session.erp_log_file_name}
+                                processed={session.erp_log_processed_rows}
+                                total={session.erp_log_row_count}
+                                skipped={session.erp_log_skipped_rows}
+                                status={session.status}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
 
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
