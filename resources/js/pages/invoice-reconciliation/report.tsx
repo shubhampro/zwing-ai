@@ -1,7 +1,18 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Download, X } from 'lucide-react';
+import { ArrowLeft, Copy, Download, Search, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { dashboard } from '@/routes';
 import { index, report, show } from '@/routes/invoice-reconciliation';
 
@@ -32,12 +43,26 @@ type Pagination = {
     last_page: number;
 };
 
+type DifferenceFilter = 'all' | 'zero' | 'non_zero' | 'missing_side';
+
+type StatusOptions = {
+    zwing: string[];
+    erp: string[];
+};
+
 type Props = {
     session: { id: number; name: string; v_id: number; status: string };
     summary: Summary;
     rows: ReportRow[];
     pagination: Pagination;
     filter: string;
+    filters: {
+        invoice_query: string;
+        zwing_status: string;
+        erp_status: string;
+        difference: DifferenceFilter;
+    };
+    statusOptions: StatusOptions;
 };
 
 const statusConfig: Record<MatchStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -57,6 +82,15 @@ const filters: { value: string; label: string }[] = [
     { value: 'erp_only', label: 'ERP only' },
 ];
 
+const differenceFilters: { value: DifferenceFilter; label: string }[] = [
+    { value: 'all', label: 'All differences' },
+    { value: 'zero', label: 'Only exact amount match' },
+    { value: 'non_zero', label: 'Only amount difference' },
+    { value: 'missing_side', label: 'Only missing on one side' },
+];
+
+const ANY_STATUS = '__any__';
+
 function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
     return (
         <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
@@ -66,19 +100,132 @@ function SummaryCard({ label, value, color }: { label: string; value: number; co
     );
 }
 
-export default function InvoiceReconciliationReport({ session, summary, rows, pagination, filter }: Props) {
+function formatAmount(value: number | null): string {
+    return value !== null ? value.toLocaleString() : '—';
+}
+
+function formatDiff(row: ReportRow): string {
+    if (row.zwing_total_amount === null || row.erp_total_amount === null) {
+        return '—';
+    }
+    const diff = row.zwing_total_amount - row.erp_total_amount;
+    return diff > 0 ? `+${diff}` : String(diff);
+}
+
+async function copyText(text: string, label: string): Promise<void> {
+    try {
+        await navigator.clipboard.writeText(text);
+        toast.success(`${label} copied`);
+    } catch {
+        toast.error('Could not copy to clipboard');
+    }
+}
+
+function CopyIconButton({ text, label }: { text: string; label: string }) {
+    return (
+        <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            onClick={() => {
+                void copyText(text, label);
+            }}
+            title={`Copy ${label}`}
+        >
+            <Copy className="size-3.5" />
+            <span className="sr-only">Copy {label}</span>
+        </Button>
+    );
+}
+
+export default function InvoiceReconciliationReport({
+    session,
+    summary,
+    rows,
+    pagination,
+    filter,
+    filters: initialFilters,
+    statusOptions,
+}: Props) {
+    const [invoiceQuery, setInvoiceQuery] = useState(initialFilters.invoice_query);
+    const [zwingStatus, setZwingStatus] = useState(initialFilters.zwing_status || ANY_STATUS);
+    const [erpStatus, setErpStatus] = useState(initialFilters.erp_status || ANY_STATUS);
+    const [difference, setDifference] = useState<DifferenceFilter>(initialFilters.difference);
+
+    const activeFilters = useMemo(() => {
+        return {
+            filter,
+            invoice_query: invoiceQuery.trim(),
+            zwing_status: zwingStatus === ANY_STATUS ? '' : zwingStatus,
+            erp_status: erpStatus === ANY_STATUS ? '' : erpStatus,
+            difference,
+        };
+    }, [difference, erpStatus, filter, invoiceQuery, zwingStatus]);
+
+    function buildQueryParams(page = 1) {
+        return {
+            filter: activeFilters.filter,
+            invoice_query: activeFilters.invoice_query,
+            zwing_status: activeFilters.zwing_status,
+            erp_status: activeFilters.erp_status,
+            difference: activeFilters.difference,
+            page,
+        };
+    }
+
+    const exportQueryString = useMemo(() => {
+        const params = new URLSearchParams();
+        if (activeFilters.filter !== 'all') {
+            params.set('filter', activeFilters.filter);
+        }
+        if (activeFilters.invoice_query !== '') {
+            params.set('invoice_query', activeFilters.invoice_query);
+        }
+        if (activeFilters.zwing_status !== '') {
+            params.set('zwing_status', activeFilters.zwing_status);
+        }
+        if (activeFilters.erp_status !== '') {
+            params.set('erp_status', activeFilters.erp_status);
+        }
+        if (activeFilters.difference !== 'all') {
+            params.set('difference', activeFilters.difference);
+        }
+        return params.toString();
+    }, [activeFilters]);
+
     function applyFilter(value: string) {
-        router.get(report.url(session.id), { filter: value, page: 1 }, { preserveScroll: false });
+        router.get(
+            report.url(session.id),
+            {
+                ...buildQueryParams(1),
+                filter: value,
+            },
+            { preserveScroll: false },
+        );
+    }
+
+    function applyAdvancedFilters() {
+        router.get(report.url(session.id), buildQueryParams(1), { preserveScroll: false });
     }
 
     function clearFilters() {
-        router.get(report.url(session.id), {}, { preserveScroll: false });
+        setInvoiceQuery('');
+        setZwingStatus(ANY_STATUS);
+        setErpStatus(ANY_STATUS);
+        setDifference('all');
+        router.get(report.url(session.id), { filter: 'all', page: 1 }, { preserveScroll: false });
     }
 
-    const isFiltered = filter !== 'all';
+    const isFiltered =
+        filter !== 'all' ||
+        activeFilters.invoice_query !== '' ||
+        activeFilters.zwing_status !== '' ||
+        activeFilters.erp_status !== '' ||
+        difference !== 'all';
 
     function goToPage(page: number) {
-        router.get(report.url(session.id), { filter, page }, { preserveScroll: true });
+        router.get(report.url(session.id), buildQueryParams(page), { preserveScroll: true });
     }
 
     return (
@@ -102,7 +249,7 @@ export default function InvoiceReconciliationReport({ session, summary, rows, pa
                         </div>
                     </div>
                     <a
-                        href={`/invoice-reconciliation/${session.id}/report/export${filter !== 'all' ? `?filter=${filter}` : ''}`}
+                        href={`/invoice-reconciliation/${session.id}/report/export${exportQueryString !== '' ? `?${exportQueryString}` : ''}`}
                         download
                     >
                         <Button variant="outline" size="sm">
@@ -119,6 +266,81 @@ export default function InvoiceReconciliationReport({ session, summary, rows, pa
                     <SummaryCard label="Status mismatch" value={summary.status_mismatch} color="text-destructive" />
                     <SummaryCard label="Zwing only" value={summary.zwing_only} color="text-amber-600 dark:text-amber-400" />
                     <SummaryCard label="ERP only" value={summary.erp_only} color="text-blue-600 dark:text-blue-400" />
+                </div>
+
+                <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="invoice-query">Invoice ID search</Label>
+                            <Input
+                                id="invoice-query"
+                                placeholder="e.g. Z7145600"
+                                value={invoiceQuery}
+                                onChange={(e) => setInvoiceQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        applyAdvancedFilters();
+                                    }
+                                }}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Zwing status</Label>
+                            <Select value={zwingStatus} onValueChange={setZwingStatus}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Any Zwing status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ANY_STATUS}>Any Zwing status</SelectItem>
+                                    {statusOptions.zwing.map((status) => (
+                                        <SelectItem key={`zwing-${status}`} value={status}>
+                                            {status}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>ERP status</Label>
+                            <Select value={erpStatus} onValueChange={setErpStatus}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Any ERP status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ANY_STATUS}>Any ERP status</SelectItem>
+                                    {statusOptions.erp.map((status) => (
+                                        <SelectItem key={`erp-${status}`} value={status}>
+                                            {status}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Amount difference type</Label>
+                            <Select value={difference} onValueChange={(value: DifferenceFilter) => setDifference(value)}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {differenceFilters.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex items-end gap-2">
+                            <Button size="sm" onClick={applyAdvancedFilters} className="flex-1">
+                                <Search className="size-4" />
+                                Apply
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={clearFilters} title="Clear filters">
+                                <X className="size-4" />
+                            </Button>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -170,13 +392,14 @@ export default function InvoiceReconciliationReport({ session, summary, rows, pa
 
                                     return (
                                         <tr key={i} className="hover:bg-muted/30">
-                                            <td className="px-4 py-2.5 font-mono text-xs">{row.invoice_id}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums">
-                                                {row.zwing_total_amount !== null ? row.zwing_total_amount.toLocaleString() : '—'}
+                                            <td className="px-4 py-2.5">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-mono text-xs">{row.invoice_id}</span>
+                                                    <CopyIconButton text={row.invoice_id} label="Invoice ID" />
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums">
-                                                {row.erp_total_amount !== null ? row.erp_total_amount.toLocaleString() : '—'}
-                                            </td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums">{formatAmount(row.zwing_total_amount)}</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums">{formatAmount(row.erp_total_amount)}</td>
                                             <td
                                                 className={`px-4 py-2.5 text-right tabular-nums font-medium ${
                                                     diff === null
@@ -186,7 +409,7 @@ export default function InvoiceReconciliationReport({ session, summary, rows, pa
                                                           : 'text-destructive'
                                                 }`}
                                             >
-                                                {diff === null ? '—' : diff > 0 ? `+${diff}` : diff}
+                                                {formatDiff(row)}
                                             </td>
                                             <td className="px-4 py-2.5">{row.zwing_status ?? '—'}</td>
                                             <td className="px-4 py-2.5">{row.erp_status ?? '—'}</td>
@@ -238,7 +461,6 @@ InvoiceReconciliationReport.layout = {
     breadcrumbs: [
         { title: 'Dashboard', href: dashboard() },
         { title: 'Invoice reconciliation', href: index.url() },
-        // { title: 'Session details', href: show.url(0) },
         { title: 'Comparison report', href: report.url(0) },
     ],
 };

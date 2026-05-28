@@ -257,3 +257,46 @@ test('report compares invoices by invoice_id', function () {
             ->where('rows.0.invoice_id', 'INV-002')
             ->where('rows.0.match_status', 'zwing_only'));
 });
+
+test('report applies invoice search, separate zwing and erp status filters, and difference filters', function () {
+    $user = User::factory()->create();
+    $session = InvoiceReconSession::create([
+        'user_id' => $user->id,
+        'name' => 'filter-test',
+        'v_id' => 1,
+        'status' => 'completed',
+    ]);
+
+    $now = now()->toDateTimeString();
+
+    DB::table('zwing_invoice_reconsile')->insert([
+        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'INV-SEARCH-001', 'total_amount' => 100, 'status' => 'Success', 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'INV-SEARCH-002', 'total_amount' => 200, 'status' => 'Void', 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
+    DB::table('erp_invoice_reconsile')->insert([
+        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'INV-SEARCH-001', 'total_amount' => 120, 'status' => 'Success', 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'INV-SEARCH-002', 'total_amount' => 200, 'status' => 'Paid', 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('invoice-reconciliation.report', [
+            'invoiceReconSession' => $session,
+            'invoice_query' => '001',
+            'zwing_status' => 'Success',
+            'erp_status' => 'Success',
+            'difference' => 'non_zero',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('invoice-reconciliation/report')
+            ->has('rows', 1)
+            ->where('rows.0.invoice_id', 'INV-SEARCH-001')
+            ->where('rows.0.match_status', 'amount_mismatch')
+            ->where('filters.invoice_query', '001')
+            ->where('filters.zwing_status', 'Success')
+            ->where('filters.erp_status', 'Success')
+            ->where('filters.difference', 'non_zero')
+            ->where('statusOptions.zwing', ['Success', 'Void'])
+            ->where('statusOptions.erp', ['Paid', 'Success']));
+});
