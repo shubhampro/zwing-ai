@@ -1,8 +1,18 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Download, FileText, Loader2, X } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { ArrowLeft, Copy, Download, FileText, Loader2, Search, X } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -56,6 +66,8 @@ type Pagination = {
     last_page: number;
 };
 
+type DifferenceFilter = 'all' | 'zero' | 'non_zero' | 'missing_side';
+
 type Props = {
     session: {
         id: number;
@@ -69,6 +81,12 @@ type Props = {
     rows: ReportRow[];
     pagination: Pagination;
     filter: string;
+    filters: {
+        icode_query: string;
+        stock_point: string;
+        difference: DifferenceFilter;
+    };
+    stockPointOptions: string[];
 };
 
 const statusConfig: Record<
@@ -92,6 +110,15 @@ const filters: { value: string; label: string }[] = [
     { value: 'erp_only', label: 'ERP only' },
 ];
 
+const differenceFilters: { value: DifferenceFilter; label: string }[] = [
+    { value: 'all', label: 'All differences' },
+    { value: 'zero', label: 'Only exact qty match' },
+    { value: 'non_zero', label: 'Only qty difference' },
+    { value: 'missing_side', label: 'Only missing on one side' },
+];
+
+const ANY_STOCK_POINT = '__any__';
+
 function SummaryCard({
     label,
     value,
@@ -108,6 +135,33 @@ function SummaryCard({
                 {value.toLocaleString()}
             </p>
         </div>
+    );
+}
+
+async function copyText(text: string, label: string): Promise<void> {
+    try {
+        await navigator.clipboard.writeText(text);
+        toast.success(`${label} copied`);
+    } catch {
+        toast.error('Could not copy to clipboard');
+    }
+}
+
+function CopyIconButton({ text, label }: { text: string; label: string }) {
+    return (
+        <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            onClick={() => {
+                void copyText(text, label);
+            }}
+            title={`Copy ${label}`}
+        >
+            <Copy className="size-3.5" />
+            <span className="sr-only">Copy {label}</span>
+        </Button>
     );
 }
 
@@ -173,7 +227,49 @@ export default function StockTransactionReconciliationReport({
     rows,
     pagination,
     filter,
+    filters: initialFilters,
+    stockPointOptions,
 }: Props) {
+    const [icodeQuery, setIcodeQuery] = useState(initialFilters.icode_query);
+    const [stockPoint, setStockPoint] = useState(initialFilters.stock_point || ANY_STOCK_POINT);
+    const [difference, setDifference] = useState<DifferenceFilter>(initialFilters.difference);
+
+    const activeFilters = useMemo(() => {
+        return {
+            filter,
+            icode_query: icodeQuery.trim(),
+            stock_point: stockPoint === ANY_STOCK_POINT ? '' : stockPoint,
+            difference,
+        };
+    }, [difference, filter, icodeQuery, stockPoint]);
+
+    function buildQueryParams(page = 1) {
+        return {
+            filter: activeFilters.filter,
+            icode_query: activeFilters.icode_query,
+            stock_point: activeFilters.stock_point,
+            difference: activeFilters.difference,
+            page,
+        };
+    }
+
+    const exportQueryString = useMemo(() => {
+        const params = new URLSearchParams();
+        if (activeFilters.filter !== 'all') {
+            params.set('filter', activeFilters.filter);
+        }
+        if (activeFilters.icode_query !== '') {
+            params.set('icode_query', activeFilters.icode_query);
+        }
+        if (activeFilters.stock_point !== '') {
+            params.set('stock_point', activeFilters.stock_point);
+        }
+        if (activeFilters.difference !== 'all') {
+            params.set('difference', activeFilters.difference);
+        }
+        return params.toString();
+    }, [activeFilters]);
+
     const hasAnyLogs =
         session.zwing_log_file_name !== null ||
         session.erp_log_file_name !== null;
@@ -256,23 +352,33 @@ export default function StockTransactionReconciliationReport({
     function applyFilter(value: string) {
         router.get(
             report.url(session.id),
-            { filter: value, page: 1 },
+            {
+                ...buildQueryParams(1),
+                filter: value,
+            },
             { preserveScroll: false },
         );
     }
 
-    function clearFilters() {
-        router.get(report.url(session.id), {}, { preserveScroll: false });
+    function applyAdvancedFilters() {
+        router.get(report.url(session.id), buildQueryParams(1), { preserveScroll: false });
     }
 
-    const isFiltered = filter !== 'all';
+    function clearFilters() {
+        setIcodeQuery('');
+        setStockPoint(ANY_STOCK_POINT);
+        setDifference('all');
+        router.get(report.url(session.id), { filter: 'all', page: 1 }, { preserveScroll: false });
+    }
+
+    const isFiltered =
+        filter !== 'all' ||
+        activeFilters.icode_query !== '' ||
+        activeFilters.stock_point !== '' ||
+        difference !== 'all';
 
     function goToPage(page: number) {
-        router.get(
-            report.url(session.id),
-            { filter, page },
-            { preserveScroll: true },
-        );
+        router.get(report.url(session.id), buildQueryParams(page), { preserveScroll: true });
     }
 
     const selectedDiff =
@@ -335,7 +441,7 @@ export default function StockTransactionReconciliationReport({
                         </div>
                     </div>
                     <a
-                        href={`/stock-transaction-reconciliation/${session.id}/report/export${filter !== 'all' ? `?filter=${filter}` : ''}`}
+                        href={`/stock-transaction-reconciliation/${session.id}/report/export${exportQueryString !== '' ? `?${exportQueryString}` : ''}`}
                         download
                     >
                         <Button variant="outline" size="sm">
@@ -371,6 +477,68 @@ export default function StockTransactionReconciliationReport({
                         value={summary.erp_only}
                         color="text-blue-600 dark:text-blue-400"
                     />
+                </div>
+
+                <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="icode-query">Icode search</Label>
+                            <Input
+                                id="icode-query"
+                                placeholder="e.g. ND1884"
+                                value={icodeQuery}
+                                onChange={(e) => setIcodeQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        applyAdvancedFilters();
+                                    }
+                                }}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Stock point</Label>
+                            <Select value={stockPoint} onValueChange={setStockPoint}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Any stock point" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ANY_STOCK_POINT}>Any stock point</SelectItem>
+                                    {stockPointOptions.map((option) => (
+                                        <SelectItem key={option} value={option}>
+                                            {option}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Qty difference type</Label>
+                            <Select
+                                value={difference}
+                                onValueChange={(value: DifferenceFilter) => setDifference(value)}
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {differenceFilters.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex items-end gap-2">
+                            <Button size="sm" onClick={applyAdvancedFilters} className="flex-1">
+                                <Search className="size-4" />
+                                Apply
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={clearFilters} title="Clear filters">
+                                <X className="size-4" />
+                            </Button>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -463,8 +631,11 @@ export default function StockTransactionReconciliationReport({
                                             <td className="px-4 py-2.5">
                                                 {row.site_code}
                                             </td>
-                                            <td className="px-4 py-2.5 font-mono text-xs">
-                                                {row.icode}
+                                            <td className="px-4 py-2.5">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-mono text-xs">{row.icode}</span>
+                                                    <CopyIconButton text={row.icode} label="Icode" />
+                                                </div>
                                             </td>
                                             <td className="px-4 py-2.5 text-muted-foreground">
                                                 {row.batch_no || '—'}

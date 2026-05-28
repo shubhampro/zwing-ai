@@ -4,6 +4,7 @@ use App\Jobs\ParseStockReconciliationCsv;
 use App\Models\StockReconSession;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -309,6 +310,46 @@ test('csv upload rejects log file missing required columns', function () {
             'zwing_log_csv' => UploadedFile::fake()->createWithContent('bad-log.csv', $badLogCsv),
         ])
         ->assertSessionHasErrors('zwing_log_csv');
+});
+
+test('report applies icode search, stock point filter, and difference filters', function () {
+    $user = User::factory()->create();
+    $session = StockReconSession::create([
+        'user_id' => $user->id,
+        'name' => 'filter-test',
+        'v_id' => 1,
+        'status' => 'completed',
+    ]);
+
+    $now = now()->toDateTimeString();
+
+    DB::table('zwing_stock_reconsile')->insert([
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B1', 'barcode' => 'A', 'icode' => 'ND-SEARCH-001', 'stock_point_name' => 'Packet', 'site_code' => '10', 'sprefcode' => 3, 'qty' => 10, 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B2', 'barcode' => 'A', 'icode' => 'ND-SEARCH-002', 'stock_point_name' => 'Shelf', 'site_code' => '10', 'sprefcode' => 1, 'qty' => 20, 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
+    DB::table('erp_stock_reconsile')->insert([
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B1', 'barcode' => 'A', 'icode' => 'ND-SEARCH-001', 'stock_point_name' => 'Packet', 'site_code' => '10', 'sprefcode' => 3, 'qty' => 12, 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B2', 'barcode' => 'A', 'icode' => 'ND-SEARCH-002', 'stock_point_name' => 'SALE', 'site_code' => '10', 'sprefcode' => 1, 'qty' => 20, 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('stock-transaction-reconciliation.report', [
+            'stockReconSession' => $session,
+            'icode_query' => '001',
+            'stock_point' => 'Packet',
+            'difference' => 'non_zero',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('stock-transaction-reconciliation/report')
+            ->has('rows', 1)
+            ->where('rows.0.icode', 'ND-SEARCH-001')
+            ->where('rows.0.match_status', 'qty_mismatch')
+            ->where('filters.icode_query', '001')
+            ->where('filters.stock_point', 'Packet')
+            ->where('filters.difference', 'non_zero')
+            ->where('stockPointOptions', ['Packet', 'SALE', 'Shelf']));
 });
 
 test('authenticated users can view zwing logs page', function () {
