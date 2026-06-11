@@ -79,11 +79,23 @@ class InvoiceReconciliationController extends Controller
         abort_if($invoiceReconSession->user_id !== $request->user()->id, 403);
 
         $filter = $request->get('filter', 'all');
+        $invoiceQuery = trim((string) $request->get('invoice_query', ''));
+        $zwingStatus = trim((string) $request->get('zwing_status', ''));
+        $erpStatus = trim((string) $request->get('erp_status', ''));
+        $difference = $request->string('difference')->toString();
+        $difference = in_array($difference, ['all', 'zero', 'non_zero', 'missing_side'], true) ? $difference : 'all';
         $perPage = 100;
         $page = max(1, (int) $request->get('page', 1));
         $sessionId = $invoiceReconSession->id;
 
         $comparisonSql = $this->comparisonSql();
+        [$filterClause, $filterParams] = $this->buildReportConstraints(
+            filter: $filter,
+            invoiceQuery: $invoiceQuery,
+            zwingStatus: $zwingStatus,
+            erpStatus: $erpStatus,
+            difference: $difference,
+        );
 
         $summary = DB::selectOne(<<<SQL
             SELECT
@@ -96,17 +108,14 @@ class InvoiceReconciliationController extends Controller
             FROM ({$comparisonSql}) AS cmp
         SQL, [$sessionId]);
 
-        $filterClause = $filter !== 'all' ? 'WHERE match_status = ?' : '';
-        $filterParams = $filter !== 'all' ? [$sessionId, $filter] : [$sessionId];
-
         $totalRows = DB::selectOne(
             "SELECT COUNT(*) AS total FROM ({$comparisonSql}) AS cmp {$filterClause}",
-            $filterParams,
+            array_merge([$sessionId], $filterParams),
         )->total;
 
         $rows = DB::select(
             "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY invoice_id LIMIT ? OFFSET ?",
-            array_merge($filterParams, [$perPage, ($page - 1) * $perPage]),
+            array_merge([$sessionId], $filterParams, [$perPage, ($page - 1) * $perPage]),
         );
 
         return Inertia::render('invoice-reconciliation/report', [
@@ -120,6 +129,13 @@ class InvoiceReconciliationController extends Controller
                 'last_page' => (int) ceil((int) $totalRows / $perPage),
             ],
             'filter' => $filter,
+            'filters' => [
+                'invoice_query' => $invoiceQuery,
+                'zwing_status' => $zwingStatus,
+                'erp_status' => $erpStatus,
+                'difference' => $difference,
+            ],
+            'statusOptions' => $this->distinctStatusOptions($sessionId),
         ]);
     }
 
@@ -129,17 +145,30 @@ class InvoiceReconciliationController extends Controller
         abort_if($invoiceReconSession->user_id !== $request->user()->id, 403);
 
         $filter = $request->get('filter', 'all');
+        $invoiceQuery = trim((string) $request->get('invoice_query', ''));
+        $zwingStatus = trim((string) $request->get('zwing_status', ''));
+        $erpStatus = trim((string) $request->get('erp_status', ''));
+        $difference = $request->string('difference')->toString();
+        $difference = in_array($difference, ['all', 'zero', 'non_zero', 'missing_side'], true) ? $difference : 'all';
         $sessionId = $invoiceReconSession->id;
         $comparisonSql = $this->comparisonSql();
-        $filterClause = $filter !== 'all' ? 'WHERE match_status = ?' : '';
-        $filterParams = $filter !== 'all' ? [$sessionId, $filter] : [$sessionId];
+        [$filterClause, $filterParams] = $this->buildReportConstraints(
+            filter: $filter,
+            invoiceQuery: $invoiceQuery,
+            zwingStatus: $zwingStatus,
+            erpStatus: $erpStatus,
+            difference: $difference,
+        );
 
         $rows = DB::select(
             "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY invoice_id",
-            $filterParams,
+            array_merge([$sessionId], $filterParams),
         );
 
         $segment = $filter === 'all' ? 'all' : $filter;
+        if ($invoiceQuery !== '' || $zwingStatus !== '' || $erpStatus !== '' || $difference !== 'all') {
+            $segment .= '-filtered';
+        }
         $slug = preg_replace('/[^a-z0-9]+/i', '-', $invoiceReconSession->name);
         $filename = "{$slug}-{$segment}.csv";
 
@@ -281,5 +310,82 @@ class InvoiceReconciliationController extends Controller
         fclose($handle);
 
         return max(0, $count - 1);
+    }
+
+    /**
+     * @return array{zwing: array<int, string>, erp: array<int, string>}
+     */
+    private function distinctStatusOptions(int $sessionId): array
+    {
+        $zwing = DB::table('zwing_invoice_reconsile')
+            ->where('session_id', $sessionId)
+            ->whereNotNull('status')
+            ->where('status', '!=', '')
+            ->distinct()
+            ->orderBy('status')
+            ->pluck('status')
+            ->all();
+
+        $erp = DB::table('erp_invoice_reconsile')
+            ->where('session_id', $sessionId)
+            ->whereNotNull('status')
+            ->where('status', '!=', '')
+            ->distinct()
+            ->orderBy('status')
+            ->pluck('status')
+            ->all();
+
+        return [
+            'zwing' => array_values($zwing),
+            'erp' => array_values($erp),
+        ];
+    }
+
+    /**
+     * @return array{0: string, 1: array<int, mixed>}
+     */
+    private function buildReportConstraints(
+        string $filter,
+        string $invoiceQuery,
+        string $zwingStatus,
+        string $erpStatus,
+        string $difference,
+    ): array {
+        $clauses = [];
+        $params = [];
+
+        if ($filter !== 'all') {
+            $clauses[] = 'match_status = ?';
+            $params[] = $filter;
+        }
+
+        if ($invoiceQuery !== '') {
+            $clauses[] = 'invoice_id ILIKE ?';
+            $params[] = "%{$invoiceQuery}%";
+        }
+
+        if ($zwingStatus !== '') {
+            $clauses[] = 'zwing_status = ?';
+            $params[] = $zwingStatus;
+        }
+
+        if ($erpStatus !== '') {
+            $clauses[] = 'erp_status = ?';
+            $params[] = $erpStatus;
+        }
+
+        if ($difference === 'zero') {
+            $clauses[] = 'zwing_total_amount IS NOT NULL AND erp_total_amount IS NOT NULL AND zwing_total_amount = erp_total_amount';
+        } elseif ($difference === 'non_zero') {
+            $clauses[] = 'zwing_total_amount IS NOT NULL AND erp_total_amount IS NOT NULL AND zwing_total_amount <> erp_total_amount';
+        } elseif ($difference === 'missing_side') {
+            $clauses[] = '(zwing_total_amount IS NULL OR erp_total_amount IS NULL)';
+        }
+
+        if ($clauses === []) {
+            return ['', []];
+        }
+
+        return ['WHERE '.implode(' AND ', $clauses), $params];
     }
 }

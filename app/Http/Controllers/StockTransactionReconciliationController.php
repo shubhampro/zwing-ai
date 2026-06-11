@@ -92,11 +92,21 @@ class StockTransactionReconciliationController extends Controller
         abort_if($stockReconSession->user_id !== $request->user()->id, 403);
 
         $filter = $request->get('filter', 'all');
+        $icodeQuery = trim((string) $request->get('icode_query', ''));
+        $stockPoint = trim((string) $request->get('stock_point', ''));
+        $difference = $request->string('difference')->toString();
+        $difference = in_array($difference, ['all', 'zero', 'non_zero', 'missing_side'], true) ? $difference : 'all';
         $perPage = 100;
         $page = max(1, (int) $request->get('page', 1));
         $sessionId = $stockReconSession->id;
 
         $comparisonSql = $this->comparisonSql();
+        [$filterClause, $filterParams] = $this->buildReportConstraints(
+            filter: $filter,
+            icodeQuery: $icodeQuery,
+            stockPoint: $stockPoint,
+            difference: $difference,
+        );
 
         $summary = DB::selectOne(<<<SQL
             SELECT
@@ -108,17 +118,14 @@ class StockTransactionReconciliationController extends Controller
             FROM ({$comparisonSql}) AS cmp
         SQL, [$sessionId]);
 
-        $filterClause = $filter !== 'all' ? 'WHERE match_status = ?' : '';
-        $filterParams = $filter !== 'all' ? [$sessionId, $filter] : [$sessionId];
-
         $totalRows = DB::selectOne(
             "SELECT COUNT(*) AS total FROM ({$comparisonSql}) AS cmp {$filterClause}",
-            $filterParams,
+            array_merge([$sessionId], $filterParams),
         )->total;
 
         $rows = DB::select(
             "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY site_code, icode LIMIT ? OFFSET ?",
-            array_merge($filterParams, [$perPage, ($page - 1) * $perPage]),
+            array_merge([$sessionId], $filterParams, [$perPage, ($page - 1) * $perPage]),
         );
 
         return Inertia::render('stock-transaction-reconciliation/report', [
@@ -139,6 +146,12 @@ class StockTransactionReconciliationController extends Controller
                 'last_page' => (int) ceil((int) $totalRows / $perPage),
             ],
             'filter' => $filter,
+            'filters' => [
+                'icode_query' => $icodeQuery,
+                'stock_point' => $stockPoint,
+                'difference' => $difference,
+            ],
+            'stockPointOptions' => $this->distinctStockPointOptions($sessionId),
         ]);
     }
 
@@ -164,17 +177,28 @@ class StockTransactionReconciliationController extends Controller
         abort_if($stockReconSession->user_id !== $request->user()->id, 403);
 
         $filter = $request->get('filter', 'all');
+        $icodeQuery = trim((string) $request->get('icode_query', ''));
+        $stockPoint = trim((string) $request->get('stock_point', ''));
+        $difference = $request->string('difference')->toString();
+        $difference = in_array($difference, ['all', 'zero', 'non_zero', 'missing_side'], true) ? $difference : 'all';
         $sessionId = $stockReconSession->id;
         $comparisonSql = $this->comparisonSql();
-        $filterClause = $filter !== 'all' ? 'WHERE match_status = ?' : '';
-        $filterParams = $filter !== 'all' ? [$sessionId, $filter] : [$sessionId];
+        [$filterClause, $filterParams] = $this->buildReportConstraints(
+            filter: $filter,
+            icodeQuery: $icodeQuery,
+            stockPoint: $stockPoint,
+            difference: $difference,
+        );
 
         $rows = DB::select(
             "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY site_code, icode",
-            $filterParams,
+            array_merge([$sessionId], $filterParams),
         );
 
         $segment = $filter === 'all' ? 'all' : $filter;
+        if ($icodeQuery !== '' || $stockPoint !== '' || $difference !== 'all') {
+            $segment .= '-filtered';
+        }
         $slug = preg_replace('/[^a-z0-9]+/i', '-', $stockReconSession->name);
         $filename = "{$slug}-{$segment}.csv";
 
@@ -417,5 +441,69 @@ class StockTransactionReconciliationController extends Controller
 
         /** Subtract 1 for the header row */
         return max(0, $count - 1);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function distinctStockPointOptions(int $sessionId): array
+    {
+        $zwing = DB::table('zwing_stock_reconsile')
+            ->where('session_id', $sessionId)
+            ->whereNotNull('stock_point_name')
+            ->where('stock_point_name', '!=', '')
+            ->distinct()
+            ->pluck('stock_point_name');
+
+        $erp = DB::table('erp_stock_reconsile')
+            ->where('session_id', $sessionId)
+            ->whereNotNull('stock_point_name')
+            ->where('stock_point_name', '!=', '')
+            ->distinct()
+            ->pluck('stock_point_name');
+
+        return $zwing->merge($erp)->unique()->sort()->values()->all();
+    }
+
+    /**
+     * @return array{0: string, 1: array<int, mixed>}
+     */
+    private function buildReportConstraints(
+        string $filter,
+        string $icodeQuery,
+        string $stockPoint,
+        string $difference,
+    ): array {
+        $clauses = [];
+        $params = [];
+
+        if ($filter !== 'all') {
+            $clauses[] = 'match_status = ?';
+            $params[] = $filter;
+        }
+
+        if ($icodeQuery !== '') {
+            $clauses[] = 'icode ILIKE ?';
+            $params[] = "%{$icodeQuery}%";
+        }
+
+        if ($stockPoint !== '') {
+            $clauses[] = 'stock_point_name = ?';
+            $params[] = $stockPoint;
+        }
+
+        if ($difference === 'zero') {
+            $clauses[] = 'zwing_qty IS NOT NULL AND erp_qty IS NOT NULL AND zwing_qty = erp_qty';
+        } elseif ($difference === 'non_zero') {
+            $clauses[] = 'zwing_qty IS NOT NULL AND erp_qty IS NOT NULL AND zwing_qty <> erp_qty';
+        } elseif ($difference === 'missing_side') {
+            $clauses[] = '(zwing_qty IS NULL OR erp_qty IS NULL)';
+        }
+
+        if ($clauses === []) {
+            return ['', []];
+        }
+
+        return ['WHERE '.implode(' AND ', $clauses), $params];
     }
 }
