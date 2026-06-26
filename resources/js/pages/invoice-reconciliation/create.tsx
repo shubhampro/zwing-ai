@@ -1,13 +1,15 @@
 import { Head, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { uploadCsv } from '@/actions/App/Http/Controllers/InvoiceReconciliationController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cloneUploadFile } from '@/lib/clone-upload-file';
 import { dashboard } from '@/routes';
 import { create, index } from '@/routes/invoice-reconciliation';
 
-const REQUIRED_COLUMNS = ['invoice_id', 'total_amount', 'status'] as const;
+const REQUIRED_COLUMNS = ['invoice_id', 'ref_id', 'total_amount', 'status'] as const;
 
 const MAX_FILE_SIZE_MB = 512;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -28,11 +30,19 @@ function RequiredColumnsHint() {
                     </code>
                 ))}
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+                Example: one invoice with three ref IDs → three rows
+            </p>
+            <pre className="mt-1 overflow-x-auto rounded bg-background px-2 py-1.5 font-mono text-xs">
+                {`invoice_id,ref_id,total_amount,status\nINV-001,1,1500.00,paid\nINV-001,2,1500.00,paid\nINV-001,3,1500.00,paid`}
+            </pre>
         </div>
     );
 }
 
 export default function InvoiceReconciliationCreate() {
+    const [isReadingFile, setIsReadingFile] = useState(false);
+
     const {
         data,
         setData,
@@ -56,27 +66,44 @@ export default function InvoiceReconciliationCreate() {
 
     const hasBothCsvs = data.zwing_csv !== null && data.erp_csv !== null;
 
-    function handleFileChange(
+    async function handleFileChange(
         field: 'zwing_csv' | 'erp_csv',
         file: File | null,
     ) {
         clearErrors(field);
-        if (file && file.size > MAX_FILE_SIZE_BYTES) {
+
+        if (file === null) {
+            setData(field, null);
+
+            return;
+        }
+
+        if (file.size > MAX_FILE_SIZE_BYTES) {
             setError(
                 field,
                 `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is ${MAX_FILE_SIZE_MB} MB.`,
             );
             setData(field, null);
+
             return;
         }
-        setData(field, file);
+
+        setIsReadingFile(true);
+
+        try {
+            setData(field, await cloneUploadFile(file));
+        } finally {
+            setIsReadingFile(false);
+        }
     }
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        if (!hasBothCsvs) {
+
+        if (!hasBothCsvs || processing || isReadingFile) {
             return;
         }
+
         post(uploadCsv.url(), { forceFormData: true });
     }
 
@@ -91,9 +118,18 @@ export default function InvoiceReconciliationCreate() {
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         Upload Zwing (POS) and ERP invoice exports. Both files
-                        are required. Invoices are compared by{' '}
+                        are required. Use one row per{' '}
+                        <code className="rounded bg-muted px-1 font-mono text-xs">
+                            ref_id
+                        </code>{' '}
+                        — the same{' '}
                         <code className="rounded bg-muted px-1 font-mono text-xs">
                             invoice_id
+                        </code>{' '}
+                        can appear on multiple rows. Zwing and ERP rows are
+                        compared by matching{' '}
+                        <code className="rounded bg-muted px-1 font-mono text-xs">
+                            ref_id
                         </code>
                         .
                     </p>
@@ -224,10 +260,10 @@ export default function InvoiceReconciliationCreate() {
                         <Button
                             type="submit"
                             size="lg"
-                            disabled={processing || !hasBothCsvs}
+                            disabled={processing || isReadingFile || !hasBothCsvs}
                             className="w-full md:w-auto md:min-w-48"
                         >
-                            {processing ? 'Working…' : 'Proceed'}
+                            {processing || isReadingFile ? 'Working…' : 'Proceed'}
                         </Button>
                     </div>
                 </form>

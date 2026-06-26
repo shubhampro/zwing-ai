@@ -6,6 +6,7 @@ use App\Http\Requests\StoreInvoiceReconciliationCsvRequest;
 use App\Jobs\ParseInvoiceReconciliationCsv;
 use App\Models\InvoiceReconSession;
 use App\Models\User;
+use App\Support\InvoiceReconciliationComparison;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -104,7 +105,9 @@ class InvoiceReconciliationController extends Controller
                 COUNT(*) FILTER (WHERE match_status = 'amount_mismatch')   AS amount_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'status_mismatch')   AS status_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'zwing_only')        AS zwing_only,
-                COUNT(*) FILTER (WHERE match_status = 'erp_only')          AS erp_only
+                COUNT(*) FILTER (WHERE match_status = 'erp_only')          AS erp_only,
+                COUNT(*) FILTER (WHERE match_status IN ('zwing_only', 'erp_only')) AS ref_id_not_found,
+                COUNT(*) FILTER (WHERE match_status IN ('amount_mismatch', 'status_mismatch')) AS mismatch
             FROM ({$comparisonSql}) AS cmp
         SQL, [$sessionId]);
 
@@ -114,7 +117,7 @@ class InvoiceReconciliationController extends Controller
         )->total;
 
         $rows = DB::select(
-            "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY invoice_id LIMIT ? OFFSET ?",
+            "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY ref_id, invoice_id LIMIT ? OFFSET ?",
             array_merge([$sessionId], $filterParams, [$perPage, ($page - 1) * $perPage]),
         );
 
@@ -161,7 +164,7 @@ class InvoiceReconciliationController extends Controller
         );
 
         $rows = DB::select(
-            "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY invoice_id",
+            "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY ref_id, invoice_id",
             array_merge([$sessionId], $filterParams),
         );
 
@@ -180,7 +183,9 @@ class InvoiceReconciliationController extends Controller
             }
 
             fputcsv($handle, [
-                'invoice_id',
+                'mop_ref_id',
+                'zwing_invoice_id',
+                'erp_invoice_id',
                 'zwing_total_amount',
                 'erp_total_amount',
                 'amount_difference',
@@ -195,7 +200,9 @@ class InvoiceReconciliationController extends Controller
                 $diff = ($zwingAmount !== null && $erpAmount !== null) ? $zwingAmount - $erpAmount : '';
 
                 fputcsv($handle, [
-                    $row->invoice_id,
+                    $row->ref_id,
+                    $row->zwing_invoice_id ?? '',
+                    $row->erp_invoice_id ?? '',
                     $zwingAmount ?? '',
                     $erpAmount ?? '',
                     $diff,
@@ -260,7 +267,7 @@ class InvoiceReconciliationController extends Controller
         abort_if($request->user() === null, 403);
         abort_if($invoiceReconSession->user_id !== $request->user()->id, 403);
 
-        $invoiceReconSession->delete();
+        // $invoiceReconSession->delete();
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -272,26 +279,7 @@ class InvoiceReconciliationController extends Controller
 
     private function comparisonSql(): string
     {
-        return <<<'SQL'
-            SELECT
-                COALESCE(z.invoice_id, e.invoice_id) AS invoice_id,
-                z.total_amount                        AS zwing_total_amount,
-                e.total_amount                        AS erp_total_amount,
-                z.status                              AS zwing_status,
-                e.status                              AS erp_status,
-                CASE
-                    WHEN z.id IS NULL THEN 'erp_only'
-                    WHEN e.id IS NULL THEN 'zwing_only'
-                    WHEN z.total_amount = e.total_amount AND z.status = e.status THEN 'matched'
-                    WHEN z.total_amount != e.total_amount THEN 'amount_mismatch'
-                    ELSE 'status_mismatch'
-                END AS match_status
-            FROM zwing_invoice_reconsile z
-            FULL OUTER JOIN erp_invoice_reconsile e
-                ON  z.session_id = e.session_id
-                AND z.invoice_id = e.invoice_id
-            WHERE COALESCE(z.session_id, e.session_id) = ?
-        SQL;
+        return InvoiceReconciliationComparison::comparisonSql();
     }
 
     private function countLines(string $path): int
@@ -354,13 +342,21 @@ class InvoiceReconciliationController extends Controller
         $clauses = [];
         $params = [];
 
-        if ($filter !== 'all') {
+        if ($filter === 'ref_id_not_found') {
+            $clauses[] = "match_status IN ('zwing_only', 'erp_only')";
+        } elseif ($filter === 'mismatch') {
+            $clauses[] = "match_status IN ('amount_mismatch', 'status_mismatch')";
+        } elseif ($filter !== 'all') {
             $clauses[] = 'match_status = ?';
             $params[] = $filter;
         }
 
         if ($invoiceQuery !== '') {
-            $clauses[] = 'invoice_id ILIKE ?';
+            $clauses[] = '(invoice_id ILIKE ? OR zwing_ref_id ILIKE ? OR erp_ref_id ILIKE ? OR zwing_invoice_id ILIKE ? OR erp_invoice_id ILIKE ?)';
+            $params[] = "%{$invoiceQuery}%";
+            $params[] = "%{$invoiceQuery}%";
+            $params[] = "%{$invoiceQuery}%";
+            $params[] = "%{$invoiceQuery}%";
             $params[] = "%{$invoiceQuery}%";
         }
 

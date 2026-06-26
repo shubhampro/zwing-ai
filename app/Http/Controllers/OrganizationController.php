@@ -69,7 +69,7 @@ class OrganizationController extends Controller
     {
         abort_if($request->user() === null, 403);
 
-        $organization->delete();
+        // $organization->delete();
 
         Inertia::flash('toast', [
             'type' => 'success',

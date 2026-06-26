@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\InvoiceReconSession;
 use App\Models\StockReconSession;
+use App\Support\InvoiceReconciliationComparison;
 use Illuminate\Support\Facades\DB;
 
 class ReconciliationSummaryService
@@ -133,20 +134,6 @@ class ReconciliationSummaryService
 
     private function invoiceComparisonSql(): string
     {
-        return <<<'SQL'
-            SELECT
-                CASE
-                    WHEN z.id IS NULL THEN 'erp_only'
-                    WHEN e.id IS NULL THEN 'zwing_only'
-                    WHEN z.total_amount = e.total_amount AND z.status = e.status THEN 'matched'
-                    WHEN z.total_amount != e.total_amount THEN 'amount_mismatch'
-                    ELSE 'status_mismatch'
-                END AS match_status
-            FROM zwing_invoice_reconsile z
-            FULL OUTER JOIN erp_invoice_reconsile e
-                ON  z.session_id = e.session_id
-                AND z.invoice_id = e.invoice_id
-            WHERE COALESCE(z.session_id, e.session_id) = ?
-        SQL;
+        return InvoiceReconciliationComparison::comparisonSql();
     }
 }

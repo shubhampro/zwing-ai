@@ -10,7 +10,7 @@ use League\Csv\Reader;
 class StoreInvoiceReconciliationCsvRequest extends FormRequest
 {
     /** Columns every invoice reconciliation CSV must contain. */
-    public const REQUIRED_COLUMNS = ['invoice_id', 'total_amount', 'status'];
+    public const REQUIRED_COLUMNS = ['invoice_id', 'ref_id', 'total_amount', 'status'];
 
     public function authorize(): bool
     {

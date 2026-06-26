@@ -134,7 +134,7 @@ class TransactionCheckerController extends Controller
         abort_if($request->user() === null, 403);
         abort_if($session->user_id !== $request->user()->id, 403);
 
-        $session->delete();
+        // $session->delete();
 
         return response()->json(['message' => 'Deleted.']);
     }

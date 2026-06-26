@@ -24,7 +24,12 @@ type MatchStatus =
     | 'erp_only';
 
 type ReportRow = {
+    zwing_invoice_id: string | null;
+    erp_invoice_id: string | null;
     invoice_id: string;
+    zwing_ref_id: string | null;
+    erp_ref_id: string | null;
+    ref_id: string;
     zwing_total_amount: number | null;
     erp_total_amount: number | null;
     zwing_status: string | null;
@@ -39,6 +44,8 @@ type Summary = {
     status_mismatch: number;
     zwing_only: number;
     erp_only: number;
+    ref_id_not_found: number;
+    mismatch: number;
 };
 
 type Pagination = {
@@ -80,17 +87,19 @@ const statusConfig: Record<
     matched: { label: 'In both', variant: 'default' },
     amount_mismatch: { label: 'Amount mismatch', variant: 'destructive' },
     status_mismatch: { label: 'Status mismatch', variant: 'destructive' },
-    zwing_only: { label: 'Zwing only (not in ERP)', variant: 'outline' },
-    erp_only: { label: 'ERP only', variant: 'secondary' },
+    zwing_only: { label: 'Ref id not found', variant: 'outline' },
+    erp_only: { label: 'Ref id not found in Zwing', variant: 'secondary' },
 };
 
 const filters: { value: string; label: string }[] = [
     { value: 'all', label: 'All' },
     { value: 'matched', label: 'In both' },
+    { value: 'mismatch', label: 'Mismatch' },
+    { value: 'ref_id_not_found', label: 'Ref id not found' },
     { value: 'amount_mismatch', label: 'Amount mismatch' },
     { value: 'status_mismatch', label: 'Status mismatch' },
-    { value: 'zwing_only', label: 'Zwing only' },
-    { value: 'erp_only', label: 'ERP only' },
+    { value: 'zwing_only', label: 'Not in ERP' },
+    { value: 'erp_only', label: 'Not in Zwing' },
 ];
 
 const differenceFilters: { value: DifferenceFilter; label: string }[] = [
@@ -280,7 +289,7 @@ export default function InvoiceReconciliationReport({
                     </a>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
                     <SummaryCard
                         label="Total"
                         value={summary.total}
@@ -292,34 +301,29 @@ export default function InvoiceReconciliationReport({
                         color="text-green-600 dark:text-green-400"
                     />
                     <SummaryCard
-                        label="Amount mismatch"
-                        value={summary.amount_mismatch}
-                        color="text-destructive"
-                    />
-                    <SummaryCard
-                        label="Status mismatch"
-                        value={summary.status_mismatch}
-                        color="text-destructive"
-                    />
-                    <SummaryCard
-                        label="Zwing only"
-                        value={summary.zwing_only}
+                        label="Ref id not found"
+                        value={summary.ref_id_not_found}
                         color="text-amber-600 dark:text-amber-400"
                     />
                     <SummaryCard
-                        label="ERP only"
-                        value={summary.erp_only}
-                        color="text-blue-600 dark:text-blue-400"
+                        label="Mismatch"
+                        value={summary.mismatch}
+                        color="text-destructive"
+                    />
+                    <SummaryCard
+                        label="Not in ERP"
+                        value={summary.zwing_only}
+                        color="text-orange-600 dark:text-orange-400"
                     />
                 </div>
 
                 <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
                         <div className="space-y-1.5">
-                            <Label htmlFor="invoice-query">Invoice ID search</Label>
+                            <Label htmlFor="invoice-query">Invoice / Mop Ref id search</Label>
                             <Input
                                 id="invoice-query"
-                                placeholder="e.g. Z7145600"
+                                placeholder="e.g. Z7145600 or 1,2,3"
                                 value={invoiceQuery}
                                 onChange={(e) => setInvoiceQuery(e.target.value)}
                                 onKeyDown={(e) => {
@@ -418,7 +422,13 @@ export default function InvoiceReconciliationReport({
                             <thead>
                                 <tr className="border-b bg-muted/50 text-left">
                                     <th className="px-4 py-3 font-medium">
-                                        Invoice ID
+                                        Mop Ref id
+                                    </th>
+                                    <th className="px-4 py-3 font-medium">
+                                        Zwing invoice
+                                    </th>
+                                    <th className="px-4 py-3 font-medium">
+                                        ERP invoice
                                     </th>
                                     <th className="px-4 py-3 text-right font-medium">
                                         Zwing amount
@@ -444,7 +454,7 @@ export default function InvoiceReconciliationReport({
                                 {rows.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={7}
+                                            colSpan={9}
                                             className="px-4 py-10 text-center text-sm text-muted-foreground"
                                         >
                                             No rows found for the selected
@@ -464,8 +474,24 @@ export default function InvoiceReconciliationReport({
                                         <tr key={i} className="hover:bg-muted/30">
                                             <td className="px-4 py-2.5">
                                                 <div className="flex items-center gap-1">
-                                                    <span className="font-mono text-xs">{row.invoice_id}</span>
-                                                    <CopyIconButton text={row.invoice_id} label="Invoice ID" />
+                                                    <span className="font-mono text-xs">{row.ref_id}</span>
+                                                    <CopyIconButton text={row.ref_id} label="Mop Ref id" />
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2.5">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-mono text-xs">{row.zwing_invoice_id ?? '—'}</span>
+                                                    {row.zwing_invoice_id && (
+                                                        <CopyIconButton text={row.zwing_invoice_id} label="Zwing invoice ID" />
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2.5">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-mono text-xs">{row.erp_invoice_id ?? '—'}</span>
+                                                    {row.erp_invoice_id && (
+                                                        <CopyIconButton text={row.erp_invoice_id} label="ERP invoice ID" />
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-2.5 text-right tabular-nums">{formatAmount(row.zwing_total_amount)}</td>

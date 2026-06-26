@@ -89,6 +89,7 @@ class ParseInvoiceReconciliationCsv implements ShouldQueue
                 'session_id' => $session->id,
                 'v_id' => $session->v_id,
                 'invoice_id' => trim((string) $record['invoice_id']),
+                'ref_id' => trim((string) $record['ref_id']),
                 'total_amount' => (float) $record['total_amount'],
                 'status' => trim((string) $record['status']),
                 'created_at' => $now,
@@ -124,6 +125,10 @@ class ParseInvoiceReconciliationCsv implements ShouldQueue
     private function isValidRow(array $record): bool
     {
         if (! isset($record['invoice_id']) || trim((string) $record['invoice_id']) === '') {
+            return false;
+        }
+
+        if (! isset($record['ref_id']) || trim((string) $record['ref_id']) === '') {
             return false;
         }
 

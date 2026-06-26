@@ -53,12 +53,12 @@ test('dashboard shows latest completed reconciliation summaries with percentages
     ]);
 
     DB::table('zwing_invoice_reconsile')->insert([
-        ['session_id' => $invoiceSession->id, 'v_id' => 1, 'invoice_id' => 'INV-1', 'total_amount' => 100, 'status' => 'paid', 'created_at' => $now, 'updated_at' => $now],
-        ['session_id' => $invoiceSession->id, 'v_id' => 1, 'invoice_id' => 'INV-2', 'total_amount' => 200, 'status' => 'paid', 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $invoiceSession->id, 'v_id' => 1, 'invoice_id' => 'INV-1', 'ref_id' => '1', 'total_amount' => 100, 'status' => 'paid', 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $invoiceSession->id, 'v_id' => 1, 'invoice_id' => 'INV-2', 'ref_id' => '2', 'total_amount' => 200, 'status' => 'paid', 'created_at' => $now, 'updated_at' => $now],
     ]);
 
     DB::table('erp_invoice_reconsile')->insert([
-        ['session_id' => $invoiceSession->id, 'v_id' => 1, 'invoice_id' => 'INV-1', 'total_amount' => 100, 'status' => 'paid', 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $invoiceSession->id, 'v_id' => 1, 'invoice_id' => 'INV-1', 'ref_id' => '1', 'total_amount' => 100, 'status' => 'paid', 'created_at' => $now, 'updated_at' => $now],
     ]);
 
     $this->actingAs($user)
