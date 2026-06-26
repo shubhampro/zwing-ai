@@ -20,8 +20,10 @@ type MatchStatus =
     | 'matched'
     | 'amount_mismatch'
     | 'status_mismatch'
-    | 'zwing_only'
-    | 'erp_only';
+    | 'invoice_not_in_erp'
+    | 'ref_id_not_in_erp'
+    | 'invoice_not_in_zwing'
+    | 'ref_id_not_in_zwing';
 
 type ReportRow = {
     zwing_invoice_id: string | null;
@@ -87,8 +89,10 @@ const statusConfig: Record<
     matched: { label: 'In both', variant: 'default' },
     amount_mismatch: { label: 'Amount mismatch', variant: 'destructive' },
     status_mismatch: { label: 'Status mismatch', variant: 'destructive' },
-    zwing_only: { label: 'Ref id not found', variant: 'outline' },
-    erp_only: { label: 'Ref id not found in Zwing', variant: 'secondary' },
+    invoice_not_in_erp: { label: 'Not found in ERP', variant: 'outline' },
+    ref_id_not_in_erp: { label: 'Ref id not found in ERP', variant: 'outline' },
+    invoice_not_in_zwing: { label: 'Not found in Zwing', variant: 'secondary' },
+    ref_id_not_in_zwing: { label: 'Ref id not found in Zwing', variant: 'secondary' },
 };
 
 const filters: { value: string; label: string }[] = [

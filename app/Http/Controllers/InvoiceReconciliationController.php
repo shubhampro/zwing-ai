@@ -104,9 +104,9 @@ class InvoiceReconciliationController extends Controller
                 COUNT(*) FILTER (WHERE match_status = 'matched')           AS matched,
                 COUNT(*) FILTER (WHERE match_status = 'amount_mismatch')   AS amount_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'status_mismatch')   AS status_mismatch,
-                COUNT(*) FILTER (WHERE match_status = 'zwing_only')        AS zwing_only,
-                COUNT(*) FILTER (WHERE match_status = 'erp_only')          AS erp_only,
-                COUNT(*) FILTER (WHERE match_status IN ('zwing_only', 'erp_only')) AS ref_id_not_found,
+                COUNT(*) FILTER (WHERE match_status = 'invoice_not_in_erp')   AS zwing_only,
+                COUNT(*) FILTER (WHERE match_status = 'invoice_not_in_zwing') AS erp_only,
+                COUNT(*) FILTER (WHERE match_status IN ('ref_id_not_in_erp', 'ref_id_not_in_zwing')) AS ref_id_not_found,
                 COUNT(*) FILTER (WHERE match_status IN ('amount_mismatch', 'status_mismatch')) AS mismatch
             FROM ({$comparisonSql}) AS cmp
         SQL, [$sessionId]);
@@ -343,9 +343,13 @@ class InvoiceReconciliationController extends Controller
         $params = [];
 
         if ($filter === 'ref_id_not_found') {
-            $clauses[] = "match_status IN ('zwing_only', 'erp_only')";
+            $clauses[] = "match_status IN ('ref_id_not_in_erp', 'ref_id_not_in_zwing')";
         } elseif ($filter === 'mismatch') {
             $clauses[] = "match_status IN ('amount_mismatch', 'status_mismatch')";
+        } elseif ($filter === 'zwing_only') {
+            $clauses[] = "match_status = 'invoice_not_in_erp'";
+        } elseif ($filter === 'erp_only') {
+            $clauses[] = "match_status = 'invoice_not_in_zwing'";
         } elseif ($filter !== 'all') {
             $clauses[] = 'match_status = ?';
             $params[] = $filter;

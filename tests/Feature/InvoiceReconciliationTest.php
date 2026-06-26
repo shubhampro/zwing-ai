@@ -219,7 +219,7 @@ test('csv upload requires both files', function () {
         ->assertSessionHasErrors(['zwing_csv', 'erp_csv']);
 });
 
-test('report compares rows by ref_id with multiple ref_ids per invoice', function () {
+test('report compares each ref id individually after csv expansion', function () {
     $user = User::factory()->create();
     $session = InvoiceReconSession::create([
         'user_id' => $user->id,
@@ -238,7 +238,7 @@ test('report compares rows by ref_id with multiple ref_ids per invoice', functio
     ]);
 
     DB::table('erp_invoice_reconsile')->insert([
-        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'ERP-001', 'ref_id' => '2', 'total_amount' => 100, 'status' => 'paid', 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'INV-001', 'ref_id' => '2', 'total_amount' => 100, 'status' => 'paid', 'created_at' => $now, 'updated_at' => $now],
         ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'ERP-003', 'ref_id' => '5', 'total_amount' => 300, 'status' => 'paid', 'created_at' => $now, 'updated_at' => $now],
     ]);
 
@@ -248,8 +248,9 @@ test('report compares rows by ref_id with multiple ref_ids per invoice', functio
         ->assertInertia(fn (Assert $page) => $page
             ->component('invoice-reconciliation/report')
             ->where('summary.matched', 1)
-            ->where('summary.zwing_only', 3)
-            ->where('summary.erp_only', 1));
+            ->where('summary.zwing_only', 1)
+            ->where('summary.erp_only', 1)
+            ->where('summary.ref_id_not_found', 2));
 
     $this->actingAs($user)
         ->get(route('invoice-reconciliation.report', ['invoiceReconSession' => $session, 'filter' => 'matched']))
@@ -260,22 +261,24 @@ test('report compares rows by ref_id with multiple ref_ids per invoice', functio
             ->where('rows.0.zwing_ref_id', '2')
             ->where('rows.0.erp_ref_id', '2')
             ->where('rows.0.zwing_invoice_id', 'INV-001')
-            ->where('rows.0.erp_invoice_id', 'ERP-001')
+            ->where('rows.0.erp_invoice_id', 'INV-001')
             ->where('rows.0.match_status', 'matched'));
 
     $this->actingAs($user)
         ->get(route('invoice-reconciliation.report', ['invoiceReconSession' => $session, 'filter' => 'zwing_only']))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->has('rows', 3)
-            ->where('rows.0.match_status', 'zwing_only'));
+            ->has('rows', 1)
+            ->where('rows.0.zwing_invoice_id', 'INV-002')
+            ->where('rows.0.ref_id', '4')
+            ->where('rows.0.match_status', 'invoice_not_in_erp'));
 
     $this->actingAs($user)
         ->get(route('invoice-reconciliation.report', ['invoiceReconSession' => $session, 'filter' => 'ref_id_not_found']))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('summary.ref_id_not_found', 4)
-            ->has('rows', 4));
+            ->where('summary.ref_id_not_found', 2)
+            ->has('rows', 2));
 
     $this->actingAs($user)
         ->get(route('invoice-reconciliation.report', ['invoiceReconSession' => $session, 'filter' => 'mismatch']))
@@ -283,6 +286,107 @@ test('report compares rows by ref_id with multiple ref_ids per invoice', functio
         ->assertInertia(fn (Assert $page) => $page
             ->where('summary.mismatch', 0)
             ->has('rows', 0));
+});
+
+test('report shows missing ref id when zwing has 22-21 and erp has only 22', function () {
+    $user = User::factory()->create();
+    $session = InvoiceReconSession::create([
+        'user_id' => $user->id,
+        'name' => 'partial-ref-test',
+        'v_id' => 1,
+        'status' => 'completed',
+    ]);
+
+    $now = now()->toDateTimeString();
+
+    DB::table('zwing_invoice_reconsile')->insert([
+        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'PMM3001252800002', 'ref_id' => '22-21', 'total_amount' => 55000, 'status' => 'Void', 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
+    DB::table('erp_invoice_reconsile')->insert([
+        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'PMM3001252800002', 'ref_id' => '22', 'total_amount' => 55000, 'status' => 'Void', 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('invoice-reconciliation.report', $session))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('summary.matched', 1)
+            ->where('summary.zwing_only', 0)
+            ->where('summary.erp_only', 0)
+            ->where('summary.ref_id_not_found', 1));
+
+    $this->actingAs($user)
+        ->get(route('invoice-reconciliation.report', ['invoiceReconSession' => $session, 'filter' => 'matched']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('rows', 1)
+            ->where('rows.0.ref_id', '22')
+            ->where('rows.0.match_status', 'matched'));
+
+    $this->actingAs($user)
+        ->get(route('invoice-reconciliation.report', ['invoiceReconSession' => $session, 'filter' => 'ref_id_not_found']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('rows', 1)
+            ->where('rows.0.ref_id', '21')
+            ->where('rows.0.zwing_ref_id', '21')
+            ->where('rows.0.erp_ref_id', null)
+            ->where('rows.0.match_status', 'ref_id_not_in_erp'));
+});
+
+test('report does not cross-match ref ids from different invoices', function () {
+    $user = User::factory()->create();
+    $session = InvoiceReconSession::create([
+        'user_id' => $user->id,
+        'name' => 'two-invoice-test',
+        'v_id' => 1,
+        'status' => 'completed',
+    ]);
+
+    $now = now()->toDateTimeString();
+
+    DB::table('zwing_invoice_reconsile')->insert([
+        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'PMM3001252600001', 'ref_id' => '22', 'total_amount' => 55000, 'status' => 'Success', 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'PMM3001252600002', 'ref_id' => '22-21', 'total_amount' => 55000, 'status' => 'Void', 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
+    DB::table('erp_invoice_reconsile')->insert([
+        ['session_id' => $session->id, 'v_id' => 1, 'invoice_id' => 'PMM3001252600002', 'ref_id' => '22', 'total_amount' => 55000, 'status' => 'Void', 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('invoice-reconciliation.report', $session))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('summary.matched', 1)
+            ->where('summary.zwing_only', 1)
+            ->where('summary.erp_only', 0)
+            ->where('summary.ref_id_not_found', 1)
+            ->where('summary.mismatch', 0));
+
+    $this->actingAs($user)
+        ->get(route('invoice-reconciliation.report', ['invoiceReconSession' => $session, 'filter' => 'zwing_only']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('rows', 1)
+            ->where('rows.0.zwing_invoice_id', 'PMM3001252600001')
+            ->where('rows.0.ref_id', '22')
+            ->where('rows.0.match_status', 'invoice_not_in_erp'));
+
+    $this->actingAs($user)
+        ->get(route('invoice-reconciliation.report', ['invoiceReconSession' => $session, 'filter' => 'ref_id_not_found']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('rows', 1)
+            ->where('rows.0.zwing_invoice_id', 'PMM3001252600002')
+            ->where('rows.0.ref_id', '21')
+            ->where('rows.0.match_status', 'ref_id_not_in_erp'));
+
+    $this->actingAs($user)
+        ->get(route('invoice-reconciliation.report', ['invoiceReconSession' => $session, 'filter' => 'mismatch']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('rows', 0));
 });
 
 test('report applies invoice search, separate zwing and erp status filters, and difference filters', function () {

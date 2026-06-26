@@ -58,8 +58,8 @@ class ReconciliationSummaryService
                 COUNT(*) FILTER (WHERE match_status = 'matched')         AS matched,
                 COUNT(*) FILTER (WHERE match_status = 'amount_mismatch') AS amount_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'status_mismatch') AS status_mismatch,
-                COUNT(*) FILTER (WHERE match_status = 'zwing_only')      AS zwing_only,
-                COUNT(*) FILTER (WHERE match_status = 'erp_only')        AS erp_only
+                COUNT(*) FILTER (WHERE match_status IN ('invoice_not_in_erp', 'ref_id_not_in_erp')) AS zwing_only,
+                COUNT(*) FILTER (WHERE match_status IN ('invoice_not_in_zwing', 'ref_id_not_in_zwing')) AS erp_only
             FROM ({$this->invoiceComparisonSql()}) AS cmp
         SQL, [$session->id]);
 

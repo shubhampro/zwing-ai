@@ -1,11 +1,11 @@
 import { Head, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { uploadCsv } from '@/actions/App/Http/Controllers/InvoiceReconciliationController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cloneUploadFile } from '@/lib/clone-upload-file';
 import { dashboard } from '@/routes';
 import { create, index } from '@/routes/invoice-reconciliation';
 
@@ -26,22 +26,27 @@ function RequiredColumnsHint() {
                         key={col}
                         className="rounded bg-background px-1.5 py-0.5 font-mono text-xs"
                     >
-                        {col}
+                        {col === 'ref_id' ? 'ref_id (Mop Ref id)' : col}
                     </code>
                 ))}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-                Example: one invoice with three ref IDs → three rows
+                Multiple Mop Ref ids on one invoice → separate with{' '}
+                <code className="rounded bg-muted px-1 font-mono text-xs">-</code>{' '}
+                (e.g.{' '}
+                <code className="rounded bg-muted px-1 font-mono text-xs">22-21</code>
+                )
             </p>
             <pre className="mt-1 overflow-x-auto rounded bg-background px-2 py-1.5 font-mono text-xs">
-                {`invoice_id,ref_id,total_amount,status\nINV-001,1,1500.00,paid\nINV-001,2,1500.00,paid\nINV-001,3,1500.00,paid`}
+                {`invoice_id,ref_id,total_amount,status\nPMM3001252800002,22-21,55000,Void`}
             </pre>
         </div>
     );
 }
 
 export default function InvoiceReconciliationCreate() {
-    const [isReadingFile, setIsReadingFile] = useState(false);
+    const zwingInputRef = useRef<HTMLInputElement>(null);
+    const erpInputRef = useRef<HTMLInputElement>(null);
 
     const {
         data,
@@ -66,43 +71,40 @@ export default function InvoiceReconciliationCreate() {
 
     const hasBothCsvs = data.zwing_csv !== null && data.erp_csv !== null;
 
-    async function handleFileChange(
+    function handleFileChange(
         field: 'zwing_csv' | 'erp_csv',
         file: File | null,
     ) {
         clearErrors(field);
-
-        if (file === null) {
-            setData(field, null);
-
-            return;
-        }
-
-        if (file.size > MAX_FILE_SIZE_BYTES) {
+        if (file && file.size > MAX_FILE_SIZE_BYTES) {
             setError(
                 field,
                 `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is ${MAX_FILE_SIZE_MB} MB.`,
             );
             setData(field, null);
-
             return;
         }
-
-        setIsReadingFile(true);
-
-        try {
-            setData(field, await cloneUploadFile(file));
-        } finally {
-            setIsReadingFile(false);
-        }
+        setData(field, file);
     }
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
 
-        if (!hasBothCsvs || processing || isReadingFile) {
+        const zwing_csv = zwingInputRef.current?.files?.[0] ?? null;
+        const erp_csv = erpInputRef.current?.files?.[0] ?? null;
+
+        if (!zwing_csv || !erp_csv || processing) {
             return;
         }
+
+        flushSync(() => {
+            setData({
+                name: data.name,
+                v_id: data.v_id,
+                zwing_csv,
+                erp_csv,
+            });
+        });
 
         post(uploadCsv.url(), { forceFormData: true });
     }
@@ -118,20 +120,24 @@ export default function InvoiceReconciliationCreate() {
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         Upload Zwing (POS) and ERP invoice exports. Both files
-                        are required. Use one row per{' '}
+                        are required. One row per invoice — multiple Mop Ref ids
+                        go in{' '}
                         <code className="rounded bg-muted px-1 font-mono text-xs">
                             ref_id
                         </code>{' '}
-                        — the same{' '}
+                        separated by{' '}
+                        <code className="rounded bg-muted px-1 font-mono text-xs">
+                            -
+                        </code>{' '}
+                        (e.g.{' '}
+                        <code className="rounded bg-muted px-1 font-mono text-xs">
+                            22-21
+                        </code>
+                        ). Rows match on the same{' '}
                         <code className="rounded bg-muted px-1 font-mono text-xs">
                             invoice_id
                         </code>{' '}
-                        can appear on multiple rows. Zwing and ERP rows are
-                        compared by matching{' '}
-                        <code className="rounded bg-muted px-1 font-mono text-xs">
-                            ref_id
-                        </code>
-                        .
+                        and each Mop Ref id.
                     </p>
                 </div>
 
@@ -185,6 +191,7 @@ export default function InvoiceReconciliationCreate() {
                                     CSV file
                                 </Label>
                                 <input
+                                    ref={zwingInputRef}
                                     id="invoice-csv-zwing"
                                     name="zwing_csv"
                                     type="file"
@@ -226,6 +233,7 @@ export default function InvoiceReconciliationCreate() {
                                     CSV file
                                 </Label>
                                 <input
+                                    ref={erpInputRef}
                                     id="invoice-csv-erp"
                                     name="erp_csv"
                                     type="file"
@@ -260,10 +268,10 @@ export default function InvoiceReconciliationCreate() {
                         <Button
                             type="submit"
                             size="lg"
-                            disabled={processing || isReadingFile || !hasBothCsvs}
+                            disabled={processing || !hasBothCsvs}
                             className="w-full md:w-auto md:min-w-48"
                         >
-                            {processing || isReadingFile ? 'Working…' : 'Proceed'}
+                            {processing ? 'Working…' : 'Proceed'}
                         </Button>
                     </div>
                 </form>

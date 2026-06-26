@@ -12,14 +12,14 @@ return new class extends Migration
             $table->string('ref_id', 500)
                 ->default('')
                 ->after('invoice_id')
-                ->comment('Reference ID used for cross-system matching (one per row)');
+                ->comment('Hyphen-separated Mop Ref ids used for cross-system matching (e.g. 22-21)');
         });
 
         Schema::table('erp_invoice_reconsile', function (Blueprint $table) {
             $table->string('ref_id', 500)
                 ->default('')
                 ->after('invoice_id')
-                ->comment('Reference ID used for cross-system matching (one per row)');
+                ->comment('Hyphen-separated Mop Ref ids used for cross-system matching (e.g. 22-21)');
         });
     }
 
