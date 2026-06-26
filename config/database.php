@@ -115,15 +115,22 @@ return [
             'options' => [],
         ],
 
-        'mongodb_ssh' => [
+        'mongodb_ssh' => env('MONGODB_URI') ? [
             'driver' => 'mongodb',
-            'host' => '127.0.0.1',
-            'port' => env('MONGODB_SSH_LOCAL_PORT', 37017),
-            'database' => env('MONGODB_SSH_DATABASE', ''),
-            'username' => env('MONGODB_SSH_USERNAME', ''),
-            'password' => env('MONGODB_SSH_PASSWORD', ''),
+            'dsn' => env('MONGODB_URI'),
+            'database' => env('MONGODB_SSH_DATABASE', env('MONGO_DB_DATABASE', '')),
             'options' => [
-                'database' => env('MONGODB_SSH_DATABASE', ''),
+                'database' => env('MONGODB_SSH_DATABASE', env('MONGO_DB_DATABASE', '')),
+            ],
+        ] : [
+            'driver' => 'mongodb',
+            'host' => env('MONGODB_SSH_HOST', env('MONGO_DB_HOST', '127.0.0.1')),
+            'port' => env('MONGODB_SSH_LOCAL_PORT', env('MONGO_DB_PORT', 37017)),
+            'database' => env('MONGODB_SSH_DATABASE', env('MONGO_DB_DATABASE', '')),
+            'username' => env('MONGODB_SSH_USERNAME', env('MONGO_DB_USERNAME', '')),
+            'password' => env('MONGODB_SSH_PASSWORD', env('MONGO_DB_PASSWORD', '')),
+            'options' => [
+                'database' => env('MONGODB_SSH_DATABASE', env('MONGO_DB_DATABASE', '')),
             ],
         ],
 

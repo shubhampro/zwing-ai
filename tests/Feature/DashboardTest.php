@@ -20,7 +20,12 @@ test('authenticated users can visit the dashboard', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('dashboard')
             ->where('stockSummary', null)
-            ->where('invoiceSummary', null));
+            ->where('invoiceSummary', null)
+            ->has('moduleHub')
+            ->has('moduleHub.assistant')
+            ->has('moduleHub.inbound_sync')
+            ->has('moduleHub.outbound_unsync')
+            ->has('moduleHub.model_training'));
 });
 
 test('dashboard shows latest completed reconciliation summaries with percentages', function () {

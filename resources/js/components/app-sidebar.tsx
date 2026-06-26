@@ -1,11 +1,14 @@
 import { Link } from '@inertiajs/react';
 import {
     ArrowLeftRight,
+    ArrowDownToLine,
+    BrainCircuit,
     Building2,
     ClipboardCheck,
-    Database,
     FileText,
     LayoutGrid,
+    MessageSquare,
+    RefreshCcw,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -21,10 +24,13 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { index as databaseConnectionsIndex } from '@/routes/database-connections';
+import { index as assistantIndex } from '@/routes/assistant';
 import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconciliation';
+import { index as inboundSyncIndex } from '@/routes/inbound-sync';
+import { index as outboundUnsyncIndex } from '@/routes/outbound-unsync';
 import { index as stockTransactionReconciliationIndex } from '@/routes/stock-transaction-reconciliation';
 import { index as transactionCheckerIndex } from '@/routes/transaction-checker';
+import { index as modelTrainingIndex } from '@/routes/model-training';
 import { index as organizationsIndex } from '@/routes/organizations';
 import type { NavItem } from '@/types';
 
@@ -50,9 +56,29 @@ const mainNavItems: NavItem[] = [
         icon: ClipboardCheck,
     },
     {
+        title: 'Outbound Unsync',
+        href: outboundUnsyncIndex.url(),
+        icon: RefreshCcw,
+    },
+    {
+        title: 'Inbound Sync',
+        href: inboundSyncIndex.url(),
+        icon: ArrowDownToLine,
+    },
+    {
         title: 'Invoice reconciliation',
         href: invoiceReconciliationIndex.url(),
         icon: FileText,
+    },
+    {
+        title: 'AI Assistant',
+        href: assistantIndex.url(),
+        icon: MessageSquare,
+    },
+    {
+        title: 'Model training',
+        href: modelTrainingIndex.url(),
+        icon: BrainCircuit,
     },
 ];
 

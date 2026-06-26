@@ -1,0 +1,9 @@
+Case Number,Subject,Status,Account Name,Description,Internal Comments
+00136223,Coupon redemption failing at store,Resolved,House of Anita Dongre Private Limited-New,Customer unable to redeem coupon at POS,"Root Cause Analysis (RCA): The store configuration was missing/incorrect at the EMR end, which prevented the coupon redemption process from completing successfully. Solution: The store has now been configured correctly. The coupon redemption process is working as expected."
+00136224,Duplicate ticket - same coupon issue,Closed,Test Account Ltd,Same coupon issue reported again,"Duplicate ticket. Same issue already reported in case 00136223. No new issue found."
+00136225,User entered wrong coupon code,Resolved,Retail Corp,Expired coupon used at billing,"User error - customer entered expired coupon code. Working as expected. Need to educate the user."
+00136226,Stock sync mismatch between Zwing and ERP,Resolved,Fabindia Retail,Opening stock not matching in reports,"Root Cause Analysis (RCA): Data sync job failed due to API timeout between Zwing and ERP integration. Stock records were not updated for 2 stores. Solution: Re-triggered sync and verified counts."
+00136227,Enhancement - add export button on dashboard,Closed,Metro Brands,Client wants new export feature on dashboard,"Enhancement request. Feature request only. No bug or system failure. Working as designed."
+00136228,POS login issue - intermittent,Open,Shoppers Stop,Staff unable to login sometimes,"Checked from our end. Login working fine now. Please ask client to retry."
+00136229,Permission denied for refund API,Resolved,Reliance Retail,Refund API returning 403,"Root Cause Analysis (RCA): Refund API permission was not assigned to the store role in backend. Solution: Permission granted and refund flow verified."
+00136230,Blank internal note case,Resolved,Sample Client Pvt Ltd,Invoice not printing,""

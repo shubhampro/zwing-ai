@@ -60,6 +60,12 @@ class AppServiceProvider extends ServiceProvider
         $writePattern = '/^\s*(insert|update|delete|drop|truncate|alter|create|replace|rename)\b/i';
 
         foreach (['mysql_ssh', 'mongodb_ssh'] as $connection) {
+            $database = config("database.connections.{$connection}.database");
+
+            if (! is_string($database) || $database === '') {
+                continue;
+            }
+
             DB::connection($connection)->beforeExecuting(function (string $sql) use ($connection, $writePattern): void {
                 if (preg_match($writePattern, $sql)) {
                     throw new \RuntimeException("Connection [{$connection}] is read-only. Write query rejected: {$sql}");

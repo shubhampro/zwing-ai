@@ -1,8 +1,12 @@
 <?php
 
+use App\Http\Controllers\ChatAssistantController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InboundSyncController;
 use App\Http\Controllers\InvoiceReconciliationController;
+use App\Http\Controllers\ModelTrainingController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OutboundUnsyncController;
 use App\Http\Controllers\StockTransactionReconciliationController;
 use App\Http\Controllers\TransactionCheckerController;
 use Illuminate\Support\Facades\Route;
@@ -61,6 +65,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('invoice-reconciliation.report.export');
     Route::delete('invoice-reconciliation/{invoiceReconSession}', [InvoiceReconciliationController::class, 'destroy'])
         ->name('invoice-reconciliation.destroy');
+
+    Route::get('outbound-unsync', [OutboundUnsyncController::class, 'index'])
+        ->name('outbound-unsync.index');
+    Route::post('outbound-unsync/check', [OutboundUnsyncController::class, 'check'])
+        ->name('outbound-unsync.check');
+
+    Route::get('inbound-sync', [InboundSyncController::class, 'index'])
+        ->name('inbound-sync.index');
+    Route::post('inbound-sync/check', [InboundSyncController::class, 'check'])
+        ->name('inbound-sync.check');
+
+    Route::get('assistant', [ChatAssistantController::class, 'index'])
+        ->name('assistant.index');
+    Route::get('assistant/bootstrap', [ChatAssistantController::class, 'bootstrap'])
+        ->name('assistant.bootstrap');
+    Route::post('assistant/messages', [ChatAssistantController::class, 'send'])
+        ->name('assistant.messages.send');
+    Route::post('assistant/reset', [ChatAssistantController::class, 'reset'])
+        ->name('assistant.reset');
+
+    Route::get('model-training', [ModelTrainingController::class, 'index'])
+        ->name('model-training.index');
+    Route::get('model-training/create', [ModelTrainingController::class, 'create'])
+        ->name('model-training.create');
+    Route::post('model-training/preview', [ModelTrainingController::class, 'preview'])
+        ->name('model-training.preview');
+    Route::post('model-training/upload', [ModelTrainingController::class, 'uploadCsv'])
+        ->name('model-training.upload');
+    Route::post('model-training/retrain', [ModelTrainingController::class, 'retrain'])
+        ->name('model-training.retrain');
 });
 
 require __DIR__.'/settings.php';
