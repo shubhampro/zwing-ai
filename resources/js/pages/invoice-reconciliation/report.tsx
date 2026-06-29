@@ -13,6 +13,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/copy-to-clipboard';
 import { dashboard } from '@/routes';
 import { index, report, show } from '@/routes/invoice-reconciliation';
 
@@ -20,10 +22,9 @@ type MatchStatus =
     | 'matched'
     | 'amount_mismatch'
     | 'status_mismatch'
+    | 'mop_ref_mismatch'
     | 'invoice_not_in_erp'
-    | 'ref_id_not_in_erp'
-    | 'invoice_not_in_zwing'
-    | 'ref_id_not_in_zwing';
+    | 'invoice_not_in_zwing';
 
 type ReportRow = {
     zwing_invoice_id: string | null;
@@ -46,7 +47,7 @@ type Summary = {
     status_mismatch: number;
     zwing_only: number;
     erp_only: number;
-    ref_id_not_found: number;
+    mop_ref_mismatch: number;
     mismatch: number;
 };
 
@@ -87,19 +88,18 @@ const statusConfig: Record<
     }
 > = {
     matched: { label: 'In both', variant: 'default' },
+    mop_ref_mismatch: { label: 'Mop Ref mismatch', variant: 'destructive' },
     amount_mismatch: { label: 'Amount mismatch', variant: 'destructive' },
     status_mismatch: { label: 'Status mismatch', variant: 'destructive' },
     invoice_not_in_erp: { label: 'Not found in ERP', variant: 'outline' },
-    ref_id_not_in_erp: { label: 'Ref id not found in ERP', variant: 'outline' },
     invoice_not_in_zwing: { label: 'Not found in Zwing', variant: 'secondary' },
-    ref_id_not_in_zwing: { label: 'Ref id not found in Zwing', variant: 'secondary' },
 };
 
 const filters: { value: string; label: string }[] = [
     { value: 'all', label: 'All' },
     { value: 'matched', label: 'In both' },
-    { value: 'mismatch', label: 'Mismatch' },
-    { value: 'ref_id_not_found', label: 'Ref id not found' },
+    { value: 'mismatch', label: 'All mismatches' },
+    { value: 'mop_ref_mismatch', label: 'Mop Ref mismatch' },
     { value: 'amount_mismatch', label: 'Amount mismatch' },
     { value: 'status_mismatch', label: 'Status mismatch' },
     { value: 'zwing_only', label: 'Not in ERP' },
@@ -114,6 +114,11 @@ const differenceFilters: { value: DifferenceFilter; label: string }[] = [
 ];
 
 const ANY_STATUS = '__any__';
+
+const ZWING_HEAD = 'border-b bg-amber-500/10 px-4 py-2 text-center text-xs font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-300';
+const ERP_HEAD = 'border-b bg-blue-500/10 px-4 py-2 text-center text-xs font-semibold tracking-wide text-blue-800 uppercase dark:text-blue-300';
+const ZWING_CELL = 'bg-amber-500/[0.04]';
+const ERP_CELL = 'bg-blue-500/[0.04]';
 
 function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
     return (
@@ -130,19 +135,64 @@ function formatAmount(value: number | null): string {
     return value !== null ? value.toLocaleString() : '—';
 }
 
-function formatDiff(row: ReportRow): string {
+function amountDiff(row: ReportRow): number | null {
     if (row.zwing_total_amount === null || row.erp_total_amount === null) {
+        return null;
+    }
+
+    return row.zwing_total_amount - row.erp_total_amount;
+}
+
+function formatDiff(row: ReportRow): string {
+    const diff = amountDiff(row);
+
+    if (diff === null) {
         return '—';
     }
-    const diff = row.zwing_total_amount - row.erp_total_amount;
-    return diff > 0 ? `+${diff}` : String(diff);
+
+    return diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString();
+}
+
+function valuesDiffer(
+    zwing: string | number | null,
+    erp: string | number | null,
+): boolean {
+    if (zwing === null || erp === null) {
+        return zwing !== erp;
+    }
+
+    return zwing !== erp;
+}
+
+function compareCellClass(
+    zwing: string | number | null,
+    erp: string | number | null,
+    side: 'zwing' | 'erp',
+): string {
+    if (zwing === null && erp === null) {
+        return '';
+    }
+
+    const missing = side === 'zwing' ? zwing === null : erp === null;
+    const differs = valuesDiffer(zwing, erp);
+
+    if (missing) {
+        return 'bg-orange-500/15 ring-1 ring-inset ring-orange-500/30';
+    }
+
+    if (differs) {
+        return 'bg-destructive/10 ring-1 ring-inset ring-destructive/25';
+    }
+
+    return '';
 }
 
 async function copyText(text: string, label: string): Promise<void> {
-    try {
-        await navigator.clipboard.writeText(text);
+    const copied = await copyToClipboard(text);
+
+    if (copied) {
         toast.success(`${label} copied`);
-    } catch {
+    } else {
         toast.error('Could not copy to clipboard');
     }
 }
@@ -162,6 +212,144 @@ function CopyIconButton({ text, label }: { text: string; label: string }) {
             <Copy className="size-3.5" />
             <span className="sr-only">Copy {label}</span>
         </Button>
+    );
+}
+
+function CompareValue({
+    value,
+    copyLabel,
+    align = 'left',
+    mono = true,
+}: {
+    value: string | null;
+    copyLabel: string;
+    align?: 'left' | 'right';
+    mono?: boolean;
+}) {
+    if (value === null || value === '') {
+        return (
+            <span className="text-muted-foreground">—</span>
+        );
+    }
+
+    return (
+        <div
+            className={cn(
+                'flex items-center gap-1',
+                align === 'right' && 'justify-end',
+            )}
+        >
+            <span className={cn(mono && 'font-mono text-xs')}>{value}</span>
+            <CopyIconButton text={value} label={copyLabel} />
+        </div>
+    );
+}
+
+function ComparisonRow({ row }: { row: ReportRow }) {
+    const diff = amountDiff(row);
+    const { label, variant } = statusConfig[row.match_status];
+
+    return (
+        <tr className="divide-x divide-sidebar-border/50 hover:bg-muted/20">
+            <td className="px-3 py-3 align-middle">
+                <Badge variant={variant} className="whitespace-nowrap text-xs">
+                    {label}
+                </Badge>
+            </td>
+
+            <td
+                className={cn(
+                    'px-3 py-3 align-middle',
+                    ZWING_CELL,
+                    compareCellClass(row.zwing_ref_id, row.erp_ref_id, 'zwing'),
+                )}
+            >
+                <CompareValue
+                    value={row.zwing_ref_id}
+                    copyLabel="Zwing Mop Ref id"
+                />
+            </td>
+            <td
+                className={cn(
+                    'px-3 py-3 align-middle',
+                    ZWING_CELL,
+                    compareCellClass(row.zwing_invoice_id, row.erp_invoice_id, 'zwing'),
+                )}
+            >
+                <CompareValue
+                    value={row.zwing_invoice_id}
+                    copyLabel="Zwing invoice ID"
+                />
+            </td>
+            <td
+                className={cn(
+                    'px-3 py-3 text-right align-middle tabular-nums',
+                    ZWING_CELL,
+                    compareCellClass(row.zwing_total_amount, row.erp_total_amount, 'zwing'),
+                )}
+            >
+                {formatAmount(row.zwing_total_amount)}
+            </td>
+            <td
+                className={cn(
+                    'px-3 py-3 align-middle',
+                    ZWING_CELL,
+                    compareCellClass(row.zwing_status, row.erp_status, 'zwing'),
+                )}
+            >
+                {row.zwing_status ?? '—'}
+            </td>
+
+            <td
+                className={cn(
+                    'px-2 py-3 text-center align-middle text-xs font-semibold tabular-nums',
+                    diff === null
+                        ? 'text-muted-foreground'
+                        : diff === 0
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'bg-destructive/5 text-destructive',
+                )}
+            >
+                {formatDiff(row)}
+            </td>
+
+            <td
+                className={cn(
+                    'px-3 py-3 align-middle',
+                    ERP_CELL,
+                    compareCellClass(row.zwing_ref_id, row.erp_ref_id, 'erp'),
+                )}
+            >
+                <CompareValue value={row.erp_ref_id} copyLabel="ERP Mop Ref id" />
+            </td>
+            <td
+                className={cn(
+                    'px-3 py-3 align-middle',
+                    ERP_CELL,
+                    compareCellClass(row.zwing_invoice_id, row.erp_invoice_id, 'erp'),
+                )}
+            >
+                <CompareValue value={row.erp_invoice_id} copyLabel="ERP invoice ID" />
+            </td>
+            <td
+                className={cn(
+                    'px-3 py-3 text-right align-middle tabular-nums',
+                    ERP_CELL,
+                    compareCellClass(row.zwing_total_amount, row.erp_total_amount, 'erp'),
+                )}
+            >
+                {formatAmount(row.erp_total_amount)}
+            </td>
+            <td
+                className={cn(
+                    'px-3 py-3 align-middle',
+                    ERP_CELL,
+                    compareCellClass(row.zwing_status, row.erp_status, 'erp'),
+                )}
+            >
+                {row.erp_status ?? '—'}
+            </td>
+        </tr>
     );
 }
 
@@ -262,17 +450,13 @@ export default function InvoiceReconciliationReport({
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <Link href={show.url(session.id)}>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="shrink-0"
-                            >
+                            <Button variant="outline" size="icon" className="shrink-0">
                                 <ArrowLeft className="size-4" />
                             </Button>
                         </Link>
                         <div>
                             <h1 className="text-xl font-semibold tracking-tight">
-                                Invoice comparison report
+                                Zwing vs ERP comparison
                                 <span className="ml-2 font-mono text-base text-muted-foreground">
                                     #{session.id}
                                 </span>
@@ -293,21 +477,12 @@ export default function InvoiceReconciliationReport({
                     </a>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-                    <SummaryCard
-                        label="Total"
-                        value={summary.total}
-                        color="text-foreground"
-                    />
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+                    <SummaryCard label="Total" value={summary.total} color="text-foreground" />
                     <SummaryCard
                         label="In both"
                         value={summary.matched}
                         color="text-green-600 dark:text-green-400"
-                    />
-                    <SummaryCard
-                        label="Ref id not found"
-                        value={summary.ref_id_not_found}
-                        color="text-amber-600 dark:text-amber-400"
                     />
                     <SummaryCard
                         label="Mismatch"
@@ -315,9 +490,19 @@ export default function InvoiceReconciliationReport({
                         color="text-destructive"
                     />
                     <SummaryCard
+                        label="Mop Ref mismatch"
+                        value={summary.mop_ref_mismatch}
+                        color="text-amber-600 dark:text-amber-400"
+                    />
+                    <SummaryCard
                         label="Not in ERP"
                         value={summary.zwing_only}
                         color="text-orange-600 dark:text-orange-400"
+                    />
+                    <SummaryCard
+                        label="Not in Zwing"
+                        value={summary.erp_only}
+                        color="text-blue-600 dark:text-blue-400"
                     />
                 </div>
 
@@ -327,7 +512,7 @@ export default function InvoiceReconciliationReport({
                             <Label htmlFor="invoice-query">Invoice / Mop Ref id search</Label>
                             <Input
                                 id="invoice-query"
-                                placeholder="e.g. Z7145600 or 1,2,3"
+                                placeholder="e.g. PMM3001252800002 or 22"
                                 value={invoiceQuery}
                                 onChange={(e) => setInvoiceQuery(e.target.value)}
                                 onKeyDown={(e) => {
@@ -371,7 +556,10 @@ export default function InvoiceReconciliationReport({
                         </div>
                         <div className="space-y-1.5">
                             <Label>Amount difference type</Label>
-                            <Select value={difference} onValueChange={(value: DifferenceFilter) => setDifference(value)}>
+                            <Select
+                                value={difference}
+                                onValueChange={(value: DifferenceFilter) => setDifference(value)}
+                            >
                                 <SelectTrigger className="w-full">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -420,122 +608,74 @@ export default function InvoiceReconciliationReport({
                     )}
                 </div>
 
+                <div className="flex flex-wrap items-center gap-4 rounded-md border border-dashed px-4 py-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-2">
+                        <span className="size-3 rounded-sm bg-amber-500/20 ring-1 ring-amber-500/40" />
+                        Zwing side
+                    </span>
+                    <span className="flex items-center gap-2">
+                        <span className="size-3 rounded-sm bg-blue-500/20 ring-1 ring-blue-500/40" />
+                        ERP side
+                    </span>
+                    <span className="flex items-center gap-2">
+                        <span className="size-3 rounded-sm bg-orange-500/20 ring-1 ring-orange-500/40" />
+                        Missing on one side
+                    </span>
+                    <span className="flex items-center gap-2">
+                        <span className="size-3 rounded-sm bg-destructive/20 ring-1 ring-destructive/30" />
+                        Value differs
+                    </span>
+                </div>
+
                 <div className="rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
+                        <table className="w-full min-w-[960px] border-collapse text-sm">
                             <thead>
-                                <tr className="border-b bg-muted/50 text-left">
-                                    <th className="px-4 py-3 font-medium">
-                                        Mop Ref id
-                                    </th>
-                                    <th className="px-4 py-3 font-medium">
-                                        Zwing invoice
-                                    </th>
-                                    <th className="px-4 py-3 font-medium">
-                                        ERP invoice
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Zwing amount
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        ERP amount
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Difference
-                                    </th>
-                                    <th className="px-4 py-3 font-medium">
-                                        Zwing status
-                                    </th>
-                                    <th className="px-4 py-3 font-medium">
-                                        ERP status
-                                    </th>
-                                    <th className="px-4 py-3 font-medium">
+                                <tr>
+                                    <th
+                                        rowSpan={2}
+                                        className="border-b border-r bg-muted/50 px-3 py-3 text-left align-bottom font-medium"
+                                    >
                                         Result
                                     </th>
+                                    <th colSpan={4} className={ZWING_HEAD}>
+                                        Zwing
+                                    </th>
+                                    <th
+                                        rowSpan={2}
+                                        className="border-b border-x bg-muted/50 px-2 py-3 text-center align-middle text-xs font-medium"
+                                    >
+                                        Δ Amount
+                                    </th>
+                                    <th colSpan={4} className={ERP_HEAD}>
+                                        ERP
+                                    </th>
+                                </tr>
+                                <tr className="border-b bg-muted/30 text-left text-xs text-muted-foreground">
+                                    <th className={cn('px-3 py-2 font-medium', ZWING_CELL)}>Mop Ref id</th>
+                                    <th className={cn('px-3 py-2 font-medium', ZWING_CELL)}>Invoice</th>
+                                    <th className={cn('px-3 py-2 text-right font-medium', ZWING_CELL)}>Amount</th>
+                                    <th className={cn('px-3 py-2 font-medium', ZWING_CELL)}>Status</th>
+                                    <th className={cn('px-3 py-2 font-medium', ERP_CELL)}>Mop Ref id</th>
+                                    <th className={cn('px-3 py-2 font-medium', ERP_CELL)}>Invoice</th>
+                                    <th className={cn('px-3 py-2 text-right font-medium', ERP_CELL)}>Amount</th>
+                                    <th className={cn('px-3 py-2 font-medium', ERP_CELL)}>Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
                                 {rows.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={9}
+                                            colSpan={10}
                                             className="px-4 py-10 text-center text-sm text-muted-foreground"
                                         >
-                                            No rows found for the selected
-                                            filter.
+                                            No rows found for the selected filter.
                                         </td>
                                     </tr>
                                 )}
-                                {rows.map((row, i) => {
-                                    const diff =
-                                        row.zwing_total_amount !== null &&
-                                        row.erp_total_amount !== null
-                                            ? row.zwing_total_amount -
-                                              row.erp_total_amount
-                                            : null;
-
-                                    return (
-                                        <tr key={i} className="hover:bg-muted/30">
-                                            <td className="px-4 py-2.5">
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-mono text-xs">{row.ref_id}</span>
-                                                    <CopyIconButton text={row.ref_id} label="Mop Ref id" />
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-mono text-xs">{row.zwing_invoice_id ?? '—'}</span>
-                                                    {row.zwing_invoice_id && (
-                                                        <CopyIconButton text={row.zwing_invoice_id} label="Zwing invoice ID" />
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-mono text-xs">{row.erp_invoice_id ?? '—'}</span>
-                                                    {row.erp_invoice_id && (
-                                                        <CopyIconButton text={row.erp_invoice_id} label="ERP invoice ID" />
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums">{formatAmount(row.zwing_total_amount)}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums">{formatAmount(row.erp_total_amount)}</td>
-                                            <td
-                                                className={`px-4 py-2.5 text-right font-medium tabular-nums ${
-                                                    diff === null
-                                                        ? 'text-muted-foreground'
-                                                        : diff === 0
-                                                          ? 'text-green-600 dark:text-green-400'
-                                                          : 'text-destructive'
-                                                }`}
-                                            >
-                                                {formatDiff(row)}
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                {row.zwing_status ?? '—'}
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                {row.erp_status ?? '—'}
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                <Badge
-                                                    variant={
-                                                        statusConfig[
-                                                            row.match_status
-                                                        ].variant
-                                                    }
-                                                    className="text-xs"
-                                                >
-                                                    {
-                                                        statusConfig[
-                                                            row.match_status
-                                                        ].label
-                                                    }
-                                                </Badge>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                {rows.map((row, i) => (
+                                    <ComparisonRow key={`${row.ref_id}-${row.invoice_id}-${i}`} row={row} />
+                                ))}
                             </tbody>
                         </table>
                     </div>
@@ -543,8 +683,7 @@ export default function InvoiceReconciliationReport({
                     {pagination.last_page > 1 && (
                         <div className="flex items-center justify-between border-t px-4 py-3">
                             <p className="text-sm text-muted-foreground">
-                                Page {pagination.current_page} of{' '}
-                                {pagination.last_page} ·{' '}
+                                Page {pagination.current_page} of {pagination.last_page} ·{' '}
                                 {pagination.total.toLocaleString()} rows
                             </p>
                             <div className="flex gap-2">
@@ -552,22 +691,15 @@ export default function InvoiceReconciliationReport({
                                     variant="outline"
                                     size="sm"
                                     disabled={pagination.current_page <= 1}
-                                    onClick={() =>
-                                        goToPage(pagination.current_page - 1)
-                                    }
+                                    onClick={() => goToPage(pagination.current_page - 1)}
                                 >
                                     Previous
                                 </Button>
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    disabled={
-                                        pagination.current_page >=
-                                        pagination.last_page
-                                    }
-                                    onClick={() =>
-                                        goToPage(pagination.current_page + 1)
-                                    }
+                                    disabled={pagination.current_page >= pagination.last_page}
+                                    onClick={() => goToPage(pagination.current_page + 1)}
                                 >
                                     Next
                                 </Button>

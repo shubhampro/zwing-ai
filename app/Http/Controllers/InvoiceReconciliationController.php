@@ -98,6 +98,9 @@ class InvoiceReconciliationController extends Controller
             difference: $difference,
         );
 
+        $mopRefMismatchStatuses = InvoiceReconciliationComparison::mopRefMismatchMatchStatusSqlList();
+        $mismatchStatuses = InvoiceReconciliationComparison::mismatchMatchStatusesSqlList();
+
         $summary = DB::selectOne(<<<SQL
             SELECT
                 COUNT(*) AS total,
@@ -106,8 +109,8 @@ class InvoiceReconciliationController extends Controller
                 COUNT(*) FILTER (WHERE match_status = 'status_mismatch')   AS status_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'invoice_not_in_erp')   AS zwing_only,
                 COUNT(*) FILTER (WHERE match_status = 'invoice_not_in_zwing') AS erp_only,
-                COUNT(*) FILTER (WHERE match_status IN ('ref_id_not_in_erp', 'ref_id_not_in_zwing')) AS ref_id_not_found,
-                COUNT(*) FILTER (WHERE match_status IN ('amount_mismatch', 'status_mismatch')) AS mismatch
+                COUNT(*) FILTER (WHERE match_status IN ({$mopRefMismatchStatuses})) AS mop_ref_mismatch,
+                COUNT(*) FILTER (WHERE match_status IN ({$mismatchStatuses})) AS mismatch
             FROM ({$comparisonSql}) AS cmp
         SQL, [$sessionId]);
 
@@ -183,7 +186,8 @@ class InvoiceReconciliationController extends Controller
             }
 
             fputcsv($handle, [
-                'mop_ref_id',
+                'zwing_mop_ref_id',
+                'erp_mop_ref_id',
                 'zwing_invoice_id',
                 'erp_invoice_id',
                 'zwing_total_amount',
@@ -200,7 +204,8 @@ class InvoiceReconciliationController extends Controller
                 $diff = ($zwingAmount !== null && $erpAmount !== null) ? $zwingAmount - $erpAmount : '';
 
                 fputcsv($handle, [
-                    $row->ref_id,
+                    $row->zwing_ref_id ?? '',
+                    $row->erp_ref_id ?? '',
                     $row->zwing_invoice_id ?? '',
                     $row->erp_invoice_id ?? '',
                     $zwingAmount ?? '',
@@ -342,10 +347,10 @@ class InvoiceReconciliationController extends Controller
         $clauses = [];
         $params = [];
 
-        if ($filter === 'ref_id_not_found') {
-            $clauses[] = "match_status IN ('ref_id_not_in_erp', 'ref_id_not_in_zwing')";
+        if ($filter === 'ref_id_not_found' || $filter === 'mop_ref_mismatch') {
+            $clauses[] = "match_status = 'mop_ref_mismatch'";
         } elseif ($filter === 'mismatch') {
-            $clauses[] = "match_status IN ('amount_mismatch', 'status_mismatch')";
+            $clauses[] = 'match_status IN ('.InvoiceReconciliationComparison::mismatchMatchStatusesSqlList().')';
         } elseif ($filter === 'zwing_only') {
             $clauses[] = "match_status = 'invoice_not_in_erp'";
         } elseif ($filter === 'erp_only') {

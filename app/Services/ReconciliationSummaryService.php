@@ -52,18 +52,47 @@ class ReconciliationSummaryService
             return null;
         }
 
+        $mopRefMismatchStatuses = InvoiceReconciliationComparison::mopRefMismatchMatchStatusSqlList();
+
         $counts = DB::selectOne(<<<SQL
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE match_status = 'matched')         AS matched,
                 COUNT(*) FILTER (WHERE match_status = 'amount_mismatch') AS amount_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'status_mismatch') AS status_mismatch,
-                COUNT(*) FILTER (WHERE match_status IN ('invoice_not_in_erp', 'ref_id_not_in_erp')) AS zwing_only,
-                COUNT(*) FILTER (WHERE match_status IN ('invoice_not_in_zwing', 'ref_id_not_in_zwing')) AS erp_only
+                COUNT(*) FILTER (WHERE match_status IN ({$mopRefMismatchStatuses})) AS mop_ref_mismatch,
+                COUNT(*) FILTER (WHERE match_status = 'invoice_not_in_erp') AS zwing_only,
+                COUNT(*) FILTER (WHERE match_status = 'invoice_not_in_zwing') AS erp_only
             FROM ({$this->invoiceComparisonSql()}) AS cmp
         SQL, [$session->id]);
 
-        return $this->formatSummary($session, $counts, 'amount_mismatch', 'status_mismatch');
+        return $this->formatInvoiceSummary($session, $counts);
+    }
+
+    /**
+     * @param  object{total: int|string, matched: int|string, zwing_only: int|string, erp_only: int|string, amount_mismatch: int|string, status_mismatch: int|string, mop_ref_mismatch: int|string}  $counts
+     * @return array<string, mixed>
+     */
+    private function formatInvoiceSummary(InvoiceReconSession $session, object $counts): array
+    {
+        $summary = $this->formatSummary(
+            $session,
+            $counts,
+            'amount_mismatch',
+            'status_mismatch',
+        );
+
+        $mopRefMismatch = (int) $counts->mop_ref_mismatch;
+        $summary['mismatch'] += $mopRefMismatch;
+        $summary['mismatch_percent'] = $summary['total'] > 0
+            ? round(($summary['mismatch'] / $summary['total']) * 100, 1)
+            : 0.0;
+        $summary['mop_ref_mismatch'] = $mopRefMismatch;
+        $summary['mop_ref_mismatch_percent'] = $summary['total'] > 0
+            ? round(($mopRefMismatch / $summary['total']) * 100, 1)
+            : 0.0;
+
+        return $summary;
     }
 
     /**
