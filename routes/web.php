@@ -6,6 +6,7 @@ use App\Http\Controllers\InboundEventsRunnerController;
 use App\Http\Controllers\InvoiceReconciliationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationThirdPartyApiController;
+use App\Http\Controllers\OutboundSyncController;
 use App\Http\Controllers\StockTransactionReconciliationController;
 use App\Http\Controllers\ThirdPartyApiBatchController;
 use App\Http\Controllers\ThirdPartyApiController;
@@ -122,6 +123,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('inbound-events-runner.index');
     Route::post('inbound-events-runner/retry', [InboundEventsRunnerController::class, 'retry'])
         ->name('inbound-events-runner.retry');
+
+    Route::get('outbound-sync', [OutboundSyncController::class, 'index'])
+        ->name('outbound-sync.index');
+    Route::post('outbound-sync/fetch', [OutboundSyncController::class, 'fetch'])
+        ->name('outbound-sync.fetch');
 });
 
 require __DIR__.'/settings.php';
