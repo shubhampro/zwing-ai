@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ExpenseCashReconciliationController;
+use App\Http\Controllers\InboundEventsRunnerController;
 use App\Http\Controllers\InvoiceReconciliationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationThirdPartyApiController;
@@ -100,6 +102,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('invoice-reconciliation.report.export');
     Route::delete('invoice-reconciliation/{invoiceReconSession}', [InvoiceReconciliationController::class, 'destroy'])
         ->name('invoice-reconciliation.destroy');
+
+    Route::get('expense-cash-reconciliation', [ExpenseCashReconciliationController::class, 'index'])
+        ->name('expense-cash-reconciliation.index');
+    Route::get('expense-cash-reconciliation/create', [ExpenseCashReconciliationController::class, 'create'])
+        ->name('expense-cash-reconciliation.create');
+    Route::post('expense-cash-reconciliation/csv', [ExpenseCashReconciliationController::class, 'uploadCsv'])
+        ->name('expense-cash-reconciliation.csv');
+    Route::get('expense-cash-reconciliation/{expenseCashReconSession}', [ExpenseCashReconciliationController::class, 'show'])
+        ->name('expense-cash-reconciliation.show');
+    Route::get('expense-cash-reconciliation/{expenseCashReconSession}/report', [ExpenseCashReconciliationController::class, 'report'])
+        ->name('expense-cash-reconciliation.report');
+    Route::get('expense-cash-reconciliation/{expenseCashReconSession}/report/export', [ExpenseCashReconciliationController::class, 'exportReport'])
+        ->name('expense-cash-reconciliation.report.export');
+    Route::delete('expense-cash-reconciliation/{expenseCashReconSession}', [ExpenseCashReconciliationController::class, 'destroy'])
+        ->name('expense-cash-reconciliation.destroy');
+
+    Route::get('inbound-events-runner', [InboundEventsRunnerController::class, 'index'])
+        ->name('inbound-events-runner.index');
+    Route::post('inbound-events-runner/retry', [InboundEventsRunnerController::class, 'retry'])
+        ->name('inbound-events-runner.retry');
 });
 
 require __DIR__.'/settings.php';

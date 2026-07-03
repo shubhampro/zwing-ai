@@ -1,5 +1,15 @@
 import { Link } from '@inertiajs/react';
-import { ArrowLeftRight, Building2, ClipboardCheck, FileText, LayoutGrid, Plug } from 'lucide-react';
+import {
+    ArrowLeftRight,
+    Building2,
+    ClipboardCheck,
+    Database,
+    FileText,
+    LayoutGrid,
+    PlayCircle,
+    Wallet,
+    Plug
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,8 +24,9 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { index as databaseConnectionsIndex } from '@/routes/database-connections';
+import { index as expenseCashReconciliationIndex } from '@/routes/expense-cash-reconciliation';
 import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconciliation';
+import { index as inboundEventsRunnerIndex } from '@/routes/inbound-events-runner';
 import { index as stockTransactionReconciliationIndex } from '@/routes/stock-transaction-reconciliation';
 import { index as transactionCheckerIndex } from '@/routes/transaction-checker';
 import { index as organizationsIndex } from '@/routes/organizations';
@@ -58,6 +69,16 @@ const mainNavItems: NavItem[] = [
         title: 'Invoice reconciliation',
         href: invoiceReconciliationIndex.url(),
         icon: FileText,
+    },
+    {
+        title: 'Expense & cash reconciliation',
+        href: expenseCashReconciliationIndex.url(),
+        icon: Wallet,
+    },
+    {
+        title: 'Inbound Events Runner',
+        href: inboundEventsRunnerIndex.url(),
+        icon: PlayCircle,
     },
 ];
 
