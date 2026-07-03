@@ -20,7 +20,14 @@ test('authenticated users can visit the dashboard', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('dashboard')
             ->where('stockSummary', null)
-            ->where('invoiceSummary', null));
+            ->where('invoiceSummary', null)
+            ->where('expenseSummary', null)
+            ->has('platform')
+            ->where('platform.organizations_count', 0)
+            ->where('platform.third_party_apis_count', 0)
+            ->where('platform.completed_batches_count', 0)
+            ->where('platform.transaction_checker_runs_count', 0)
+            ->where('latestBatch', null));
 });
 
 test('dashboard shows latest completed reconciliation summaries with percentages', function () {
@@ -71,5 +78,7 @@ test('dashboard shows latest completed reconciliation summaries with percentages
             ->where('stockSummary.zwing_only_percent', 50.0)
             ->has('invoiceSummary')
             ->where('invoiceSummary.matched_percent', 50.0)
-            ->where('invoiceSummary.zwing_only_percent', 50.0));
+            ->where('invoiceSummary.zwing_only_percent', 50.0)
+            ->has('expenseSummary')
+            ->has('platform'));
 });
