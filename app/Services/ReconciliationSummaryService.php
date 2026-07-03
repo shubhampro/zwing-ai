@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ExpenseCashReconSession;
 use App\Models\InvoiceReconSession;
 use App\Models\StockReconSession;
 use App\Support\InvoiceReconciliationComparison;
@@ -70,6 +71,65 @@ class ReconciliationSummaryService
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function latestExpenseSummaryForUser(int $userId): ?array
+    {
+        $session = ExpenseCashReconSession::query()
+            ->where('user_id', $userId)
+            ->where('status', 'completed')
+            ->latest('reconciled_at')
+            ->first(['id', 'name', 'v_id', 'reconciled_at']);
+
+        if ($session === null) {
+            return null;
+        }
+
+        $counts = DB::selectOne(<<<SQL
+            SELECT
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE match_status = 'matched')           AS matched,
+                COUNT(*) FILTER (WHERE match_status = 'amount_mismatch')   AS amount_mismatch,
+                COUNT(*) FILTER (WHERE match_status = 'date_mismatch')     AS date_mismatch,
+                COUNT(*) FILTER (WHERE match_status = 'status_mismatch')   AS status_mismatch,
+                COUNT(*) FILTER (WHERE match_status = 'zwing_only')        AS zwing_only,
+                COUNT(*) FILTER (WHERE match_status = 'erp_only')          AS erp_only
+            FROM ({$this->expenseComparisonSql()}) AS cmp
+        SQL, [$session->id]);
+
+        return $this->formatExpenseSummary($session, $counts);
+    }
+
+    /**
+     * @param  object{total: int|string, matched: int|string, zwing_only: int|string, erp_only: int|string, amount_mismatch: int|string, date_mismatch: int|string, status_mismatch: int|string}  $counts
+     * @return array<string, mixed>
+     */
+    private function formatExpenseSummary(ExpenseCashReconSession $session, object $counts): array
+    {
+        $dateMismatch = (int) $counts->date_mismatch;
+        $statusMismatch = (int) $counts->status_mismatch;
+
+        $summary = $this->formatSummary(
+            $session,
+            (object) [
+                'total' => $counts->total,
+                'matched' => $counts->matched,
+                'zwing_only' => $counts->zwing_only,
+                'erp_only' => $counts->erp_only,
+                'amount_mismatch' => $counts->amount_mismatch,
+                'date_mismatch' => $dateMismatch + $statusMismatch,
+            ],
+            'amount_mismatch',
+            'date_mismatch',
+        );
+
+        $summary['date_mismatch'] = $dateMismatch;
+        $summary['status_mismatch'] = $statusMismatch;
+
+        return $summary;
+    }
+
+    /**
      * @param  object{total: int|string, matched: int|string, zwing_only: int|string, erp_only: int|string, amount_mismatch: int|string, status_mismatch: int|string, mop_ref_mismatch: int|string}  $counts
      * @return array<string, mixed>
      */
@@ -100,7 +160,7 @@ class ReconciliationSummaryService
      * @return array<string, mixed>
      */
     private function formatSummary(
-        StockReconSession|InvoiceReconSession $session,
+        StockReconSession|InvoiceReconSession|ExpenseCashReconSession $session,
         object $counts,
         string $primaryMismatchKey,
         ?string $secondaryMismatchKey = null,
@@ -164,5 +224,26 @@ class ReconciliationSummaryService
     private function invoiceComparisonSql(): string
     {
         return InvoiceReconciliationComparison::comparisonSql();
+    }
+
+    private function expenseComparisonSql(): string
+    {
+        return <<<'SQL'
+            SELECT
+                CASE
+                    WHEN z.id IS NULL THEN 'erp_only'
+                    WHEN e.id IS NULL THEN 'zwing_only'
+                    WHEN z.amount = e.amount AND z.status = e.status AND z.txn_date = e.txn_date THEN 'matched'
+                    WHEN z.amount != e.amount THEN 'amount_mismatch'
+                    WHEN z.txn_date != e.txn_date THEN 'date_mismatch'
+                    ELSE 'status_mismatch'
+                END AS match_status
+            FROM zwing_expense_cash_reconsile z
+            FULL OUTER JOIN erp_expense_cash_reconsile e
+                ON  z.session_id = e.session_id
+                AND z.site_id = e.site_id
+                AND z.doc_no = e.doc_no
+            WHERE COALESCE(z.session_id, e.session_id) = ?
+        SQL;
     }
 }

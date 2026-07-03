@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { ArrowLeftRight, BarChart2, FileText } from 'lucide-react';
+import { ArrowLeftRight, BarChart2, FileText, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -142,7 +142,7 @@ function SegmentLegend({ segments }: { segments: Segment[] }) {
 type ReconciliationSummaryPanelProps = {
     title: string;
     description: string;
-    icon: 'stock' | 'invoice';
+    icon: 'stock' | 'invoice' | 'expense';
     summary: ReconciliationSummary | null;
     emptyHref: string;
     reportHref: (sessionId: number) => string;
@@ -160,7 +160,12 @@ export function ReconciliationSummaryPanel({
     listHref,
     mismatchLabels,
 }: ReconciliationSummaryPanelProps) {
-    const Icon = icon === 'stock' ? ArrowLeftRight : FileText;
+    const Icon =
+        icon === 'stock'
+            ? ArrowLeftRight
+            : icon === 'invoice'
+              ? FileText
+              : Wallet;
 
     if (summary === null) {
         return (

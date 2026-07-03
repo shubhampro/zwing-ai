@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DashboardOverviewService;
 use App\Services\ReconciliationSummaryService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -11,6 +12,7 @@ class DashboardController extends Controller
 {
     public function __construct(
         private readonly ReconciliationSummaryService $reconciliationSummary,
+        private readonly DashboardOverviewService $dashboardOverview,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -22,6 +24,9 @@ class DashboardController extends Controller
         return Inertia::render('dashboard', [
             'stockSummary' => $this->reconciliationSummary->latestStockSummaryForUser($userId),
             'invoiceSummary' => $this->reconciliationSummary->latestInvoiceSummaryForUser($userId),
+            'expenseSummary' => $this->reconciliationSummary->latestExpenseSummaryForUser($userId),
+            'platform' => $this->dashboardOverview->platformStatsForUser($userId),
+            'latestBatch' => $this->dashboardOverview->latestBatchSummaryForUser($userId),
         ]);
     }
 }
