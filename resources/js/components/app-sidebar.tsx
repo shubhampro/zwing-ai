@@ -1,12 +1,5 @@
 import { Link } from '@inertiajs/react';
-import {
-    ArrowLeftRight,
-    Building2,
-    ClipboardCheck,
-    Database,
-    FileText,
-    LayoutGrid,
-} from 'lucide-react';
+import { ArrowLeftRight, Building2, ClipboardCheck, FileText, LayoutGrid, Plug } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -26,6 +19,8 @@ import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconcilia
 import { index as stockTransactionReconciliationIndex } from '@/routes/stock-transaction-reconciliation';
 import { index as transactionCheckerIndex } from '@/routes/transaction-checker';
 import { index as organizationsIndex } from '@/routes/organizations';
+import { index as thirdPartyApiBatchesIndex } from '@/routes/third-party-api-batches';
+import { index as thirdPartyApisIndex } from '@/routes/third-party-apis';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -38,6 +33,16 @@ const mainNavItems: NavItem[] = [
         title: 'Organizations',
         href: organizationsIndex.url(),
         icon: Building2,
+    },
+    {
+        title: 'Third party APIs',
+        href: thirdPartyApisIndex.url(),
+        icon: Plug,
+    },
+    {
+        title: 'API batches',
+        href: thirdPartyApiBatchesIndex.url(),
+        icon: FileText,
     },
     {
         title: 'Stock reconciliation',

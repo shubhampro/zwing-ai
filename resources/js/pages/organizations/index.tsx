@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Eye, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { destroy } from '@/actions/App/Http/Controllers/OrganizationController';
 import Heading from '@/components/heading';
@@ -19,13 +19,14 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { dashboard } from '@/routes';
-import { create, edit, index } from '@/routes/organizations';
+import { create, edit, index, show } from '@/routes/organizations';
 
 type Organization = {
     id: number;
     name: string;
     ba_code: string;
     vendor_id: number;
+    organization_connections_count?: number;
     created_at: string;
 };
 
@@ -114,6 +115,7 @@ export default function OrganizationsIndex({
                                 <th className="px-3 py-2 font-medium">
                                     Vendor ID
                                 </th>
+                                <th className="px-3 py-2 font-medium">APIs</th>
                                 <th className="px-3 py-2 font-medium">
                                     Created at
                                 </th>
@@ -124,7 +126,7 @@ export default function OrganizationsIndex({
                             {organizations.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={6}
+                                        colSpan={7}
                                         className="px-3 py-8 text-center text-muted-foreground"
                                     >
                                         No organizations found.{' '}
@@ -155,6 +157,9 @@ export default function OrganizationsIndex({
                                     <td className="px-3 py-2 tabular-nums">
                                         {org.vendor_id}
                                     </td>
+                                    <td className="px-3 py-2 tabular-nums">
+                                        {org.organization_connections_count ?? 0}
+                                    </td>
                                     <td className="px-3 py-2 text-muted-foreground">
                                         {new Date(
                                             org.created_at,
@@ -177,6 +182,12 @@ export default function OrganizationsIndex({
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={show.url(org.id)}>
+                                                        <Eye className="size-4" />
+                                                        View & APIs
+                                                    </Link>
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem asChild>
                                                     <Link
                                                         href={edit.url(org.id)}

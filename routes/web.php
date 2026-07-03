@@ -3,7 +3,10 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceReconciliationController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OrganizationThirdPartyApiController;
 use App\Http\Controllers\StockTransactionReconciliationController;
+use App\Http\Controllers\ThirdPartyApiBatchController;
+use App\Http\Controllers\ThirdPartyApiController;
 use App\Http\Controllers\TransactionCheckerController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -16,7 +19,43 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::resource('organizations', OrganizationController::class)
-        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+        ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
+
+    Route::post('organizations/{organization}/api-connections', [OrganizationThirdPartyApiController::class, 'storeForOrganization'])
+        ->name('organizations.api-connections.store');
+    Route::put('organizations/{organization}/api-connections/{organizationThirdPartyApi}', [OrganizationThirdPartyApiController::class, 'updateForOrganization'])
+        ->name('organizations.api-connections.update');
+    Route::delete('organizations/{organization}/api-connections/{organizationThirdPartyApi}', [OrganizationThirdPartyApiController::class, 'destroyForOrganization'])
+        ->name('organizations.api-connections.destroy');
+
+    Route::resource('third-party-apis', ThirdPartyApiController::class)
+        ->except(['show']);
+
+    Route::post('third-party-apis/{thirdPartyApi}/connections', [OrganizationThirdPartyApiController::class, 'store'])
+        ->name('third-party-apis.connections.store');
+    Route::put('third-party-apis/{thirdPartyApi}/connections/{organizationThirdPartyApi}', [OrganizationThirdPartyApiController::class, 'update'])
+        ->name('third-party-apis.connections.update');
+    Route::delete('third-party-apis/{thirdPartyApi}/connections/{organizationThirdPartyApi}', [OrganizationThirdPartyApiController::class, 'destroy'])
+        ->name('third-party-apis.connections.destroy');
+
+    Route::get('third-party-api-batches', [ThirdPartyApiBatchController::class, 'index'])
+        ->name('third-party-api-batches.index');
+    Route::get('third-party-api-batches/create', [ThirdPartyApiBatchController::class, 'create'])
+        ->name('third-party-api-batches.create');
+    Route::post('third-party-api-batches/csv', [ThirdPartyApiBatchController::class, 'uploadCsv'])
+        ->name('third-party-api-batches.csv');
+    Route::get('third-party-api-batches/{thirdPartyApiBatch}', [ThirdPartyApiBatchController::class, 'show'])
+        ->name('third-party-api-batches.show');
+    Route::get('third-party-api-batches/{thirdPartyApiBatch}/report', [ThirdPartyApiBatchController::class, 'report'])
+        ->name('third-party-api-batches.report');
+    Route::get('third-party-api-batches/{thirdPartyApiBatch}/report/export', [ThirdPartyApiBatchController::class, 'exportReport'])
+        ->name('third-party-api-batches.report.export');
+    Route::post('third-party-api-batches/{thirdPartyApiBatch}/retry-failed', [ThirdPartyApiBatchController::class, 'retryFailed'])
+        ->name('third-party-api-batches.retry-failed');
+    Route::post('third-party-api-batches/{thirdPartyApiBatch}/items/{thirdPartyApiBatchItem}/retry', [ThirdPartyApiBatchController::class, 'retryItem'])
+        ->name('third-party-api-batches.items.retry');
+    Route::delete('third-party-api-batches/{thirdPartyApiBatch}', [ThirdPartyApiBatchController::class, 'destroy'])
+        ->name('third-party-api-batches.destroy');
 
     Route::get('stock-transaction-reconciliation', [StockTransactionReconciliationController::class, 'index'])
         ->name('stock-transaction-reconciliation.index');
