@@ -1,4 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
+import { Download } from 'lucide-react';
 import { uploadCsv } from '@/actions/App/Http/Controllers/ExpenseCashReconciliationController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -9,15 +10,47 @@ import { create, index } from '@/routes/expense-cash-reconciliation';
 
 const REQUIRED_COLUMNS = ['site_id', 'doc_no', 'date', 'amount', 'status'] as const;
 
+const SAMPLE_ROWS = [
+    ['101', 'EXP-001', '2026-05-01', '1500.00', 'APPROVED'],
+    ['102', 'CASH-001', '2026-05-02', '250.50', 'VOID'],
+] as const;
+
 const MAX_FILE_SIZE_MB = 512;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+function downloadSampleCsv(): void {
+    const csv = [
+        REQUIRED_COLUMNS.join(','),
+        ...SAMPLE_ROWS.map((row) => row.join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'expense-cash-reconciliation-sample.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+}
 
 function RequiredColumnsHint() {
     return (
         <div className="rounded-md bg-muted/60 px-3 py-2">
-            <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-                Required columns
-            </p>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                    Required columns
+                </p>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs"
+                    onClick={downloadSampleCsv}
+                >
+                    <Download className="size-3.5" />
+                    Sample CSV
+                </Button>
+            </div>
             <div className="flex flex-wrap gap-1.5">
                 {REQUIRED_COLUMNS.map((col) => (
                     <code
