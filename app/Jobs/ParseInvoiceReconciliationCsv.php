@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\InvoiceReconSession;
+use App\Support\InvoiceRefId;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -85,26 +86,33 @@ class ParseInvoiceReconciliationCsv implements ShouldQueue
                 continue;
             }
 
-            $chunk[] = [
-                'session_id' => $session->id,
-                'v_id' => $session->v_id,
-                'invoice_id' => trim((string) $record['invoice_id']),
-                'total_amount' => (float) $record['total_amount'],
-                'status' => trim((string) $record['status']),
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
+            $invoiceId = trim((string) $record['invoice_id']);
+            $totalAmount = (float) $record['total_amount'];
+            $status = trim((string) $record['status']);
 
-            if (count($chunk) >= self::CHUNK_SIZE) {
-                DB::table($table)->insert($chunk);
-                $session->increment($progressColumn, count($chunk));
+            foreach (InvoiceRefId::uniqueParts((string) $record['ref_id']) as $refId) {
+                $chunk[] = [
+                    'session_id' => $session->id,
+                    'v_id' => $session->v_id,
+                    'invoice_id' => $invoiceId,
+                    'ref_id' => $refId,
+                    'total_amount' => $totalAmount,
+                    'status' => $status,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
 
-                if ($skippedChunk > 0) {
-                    $session->increment($skippedColumn, $skippedChunk);
-                    $skippedChunk = 0;
+                if (count($chunk) >= self::CHUNK_SIZE) {
+                    DB::table($table)->insert($chunk);
+                    $session->increment($progressColumn, count($chunk));
+
+                    if ($skippedChunk > 0) {
+                        $session->increment($skippedColumn, $skippedChunk);
+                        $skippedChunk = 0;
+                    }
+
+                    $chunk = [];
                 }
-
-                $chunk = [];
             }
         }
 
@@ -124,6 +132,10 @@ class ParseInvoiceReconciliationCsv implements ShouldQueue
     private function isValidRow(array $record): bool
     {
         if (! isset($record['invoice_id']) || trim((string) $record['invoice_id']) === '') {
+            return false;
+        }
+
+        if (! isset($record['ref_id']) || ! InvoiceRefId::isValid((string) $record['ref_id'])) {
             return false;
         }
 

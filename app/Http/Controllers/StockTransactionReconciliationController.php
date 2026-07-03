@@ -386,7 +386,7 @@ class StockTransactionReconciliationController extends Controller
         abort_if($request->user() === null, 403);
         abort_if($stockReconSession->user_id !== $request->user()->id, 403);
 
-        $stockReconSession->delete();
+        // $stockReconSession->delete();
 
         Inertia::flash('toast', [
             'type' => 'success',

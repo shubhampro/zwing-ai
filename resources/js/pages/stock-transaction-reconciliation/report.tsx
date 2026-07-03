@@ -21,6 +21,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { dashboard } from '@/routes';
+import { copyToClipboard } from '@/lib/copy-to-clipboard';
 import { logDetails } from '@/routes/stock-transaction-reconciliation/report';
 import { index, report, show } from '@/routes/stock-transaction-reconciliation';
 
@@ -139,10 +140,11 @@ function SummaryCard({
 }
 
 async function copyText(text: string, label: string): Promise<void> {
-    try {
-        await navigator.clipboard.writeText(text);
+    const copied = await copyToClipboard(text);
+
+    if (copied) {
         toast.success(`${label} copied`);
-    } catch {
+    } else {
         toast.error('Could not copy to clipboard');
     }
 }

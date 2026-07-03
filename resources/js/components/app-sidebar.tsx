@@ -8,6 +8,7 @@ import {
     LayoutGrid,
     PlayCircle,
     Wallet,
+    Plug
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -30,6 +31,8 @@ import { index as inboundEventsRunnerIndex } from '@/routes/inbound-events-runne
 import { index as stockTransactionReconciliationIndex } from '@/routes/stock-transaction-reconciliation';
 import { index as transactionCheckerIndex } from '@/routes/transaction-checker';
 import { index as organizationsIndex } from '@/routes/organizations';
+import { index as thirdPartyApiBatchesIndex } from '@/routes/third-party-api-batches';
+import { index as thirdPartyApisIndex } from '@/routes/third-party-apis';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -42,6 +45,16 @@ const mainNavItems: NavItem[] = [
         title: 'Organizations',
         href: organizationsIndex.url(),
         icon: Building2,
+    },
+    {
+        title: 'Third party APIs',
+        href: thirdPartyApisIndex.url(),
+        icon: Plug,
+    },
+    {
+        title: 'API batches',
+        href: thirdPartyApiBatchesIndex.url(),
+        icon: FileText,
     },
     {
         title: 'Stock reconciliation',
