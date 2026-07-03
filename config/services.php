@@ -37,6 +37,8 @@ return [
 
     'gozwing' => [
         'connect_url' => env('GOZWING_CONNECT_URL', 'https://connect.gozwing.com'),
+        'connect_username' => env('GOZWING_CONNECT_USERNAME', 'global_user'),
+        'connect_password' => env('GOZWING_CONNECT_PASSWORD', 'Global@12345$'),
     ],
 
 ];
