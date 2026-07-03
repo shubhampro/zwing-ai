@@ -106,6 +106,7 @@ class ExpenseCashReconciliationController extends Controller
                 COUNT(*) FILTER (WHERE match_status = 'amount_mismatch')   AS amount_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'date_mismatch')     AS date_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'status_mismatch')   AS status_mismatch,
+                COUNT(*) FILTER (WHERE match_status IN ('amount_mismatch', 'date_mismatch', 'status_mismatch')) AS mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'zwing_only')        AS zwing_only,
                 COUNT(*) FILTER (WHERE match_status = 'erp_only')          AS erp_only
             FROM ({$comparisonSql}) AS cmp
@@ -372,7 +373,9 @@ class ExpenseCashReconciliationController extends Controller
         $clauses = [];
         $params = [];
 
-        if ($filter !== 'all') {
+        if ($filter === 'mismatch') {
+            $clauses[] = "match_status IN ('amount_mismatch', 'date_mismatch', 'status_mismatch')";
+        } elseif ($filter !== 'all') {
             $clauses[] = 'match_status = ?';
             $params[] = $filter;
         }

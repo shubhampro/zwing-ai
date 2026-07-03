@@ -24,7 +24,6 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { index as databaseConnectionsIndex } from '@/routes/database-connections';
 import { index as expenseCashReconciliationIndex } from '@/routes/expense-cash-reconciliation';
 import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconciliation';
 import { index as inboundEventsRunnerIndex } from '@/routes/inbound-events-runner';
