@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InboundEventsRunnerController;
 use App\Http\Controllers\InvoiceReconciliationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\StockTransactionReconciliationController;
@@ -61,6 +62,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('invoice-reconciliation.report.export');
     Route::delete('invoice-reconciliation/{invoiceReconSession}', [InvoiceReconciliationController::class, 'destroy'])
         ->name('invoice-reconciliation.destroy');
+
+    Route::get('inbound-events-runner', [InboundEventsRunnerController::class, 'index'])
+        ->name('inbound-events-runner.index');
+    Route::post('inbound-events-runner/retry', [InboundEventsRunnerController::class, 'retry'])
+        ->name('inbound-events-runner.retry');
 });
 
 require __DIR__.'/settings.php';

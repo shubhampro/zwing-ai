@@ -6,6 +6,7 @@ import {
     Database,
     FileText,
     LayoutGrid,
+    PlayCircle,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -23,6 +24,7 @@ import {
 import { dashboard } from '@/routes';
 import { index as databaseConnectionsIndex } from '@/routes/database-connections';
 import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconciliation';
+import { index as inboundEventsRunnerIndex } from '@/routes/inbound-events-runner';
 import { index as stockTransactionReconciliationIndex } from '@/routes/stock-transaction-reconciliation';
 import { index as transactionCheckerIndex } from '@/routes/transaction-checker';
 import { index as organizationsIndex } from '@/routes/organizations';
@@ -53,6 +55,11 @@ const mainNavItems: NavItem[] = [
         title: 'Invoice reconciliation',
         href: invoiceReconciliationIndex.url(),
         icon: FileText,
+    },
+    {
+        title: 'Inbound Events Runner',
+        href: inboundEventsRunnerIndex.url(),
+        icon: PlayCircle,
     },
 ];
 

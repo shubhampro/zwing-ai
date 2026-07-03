@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'gozwing' => [
+        'connect_url' => env('GOZWING_CONNECT_URL', 'https://connect.gozwing.com'),
+    ],
+
 ];
