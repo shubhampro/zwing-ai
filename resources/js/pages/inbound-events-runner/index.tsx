@@ -1,5 +1,5 @@
 import { Head } from '@inertiajs/react';
-import { Loader2, Pause, Play, Upload } from 'lucide-react';
+import { Loader2, Pause, Play, Trash2, Upload } from 'lucide-react';
 import { useRef } from 'react';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useInboundEventsRunner } from '@/hooks/use-inbound-events-runner';
 import {
+    clearRunner,
     loadCsv,
     parseCsvLogIds,
     resetRunner,
@@ -87,6 +88,17 @@ export default function InboundEventsRunnerIndex({
     const failedCount = items.filter((item) => item.status === 'failed').length;
     const progress =
         items.length > 0 ? Math.round((completedCount / items.length) * 100) : 0;
+    const isComplete =
+        items.length > 0 &&
+        !running &&
+        completedCount === items.length;
+
+    function handleClear() {
+        clearRunner();
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    }
 
     return (
         <>
@@ -204,6 +216,17 @@ export default function InboundEventsRunnerIndex({
                                         onClick={resetRunner}
                                     >
                                         Reset
+                                    </Button>
+                                )}
+
+                                {isComplete && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={handleClear}
+                                    >
+                                        <Trash2 className="size-4" />
+                                        Clear data
                                     </Button>
                                 )}
                             </div>
