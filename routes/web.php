@@ -7,6 +7,7 @@ use App\Http\Controllers\InvoiceReconciliationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationThirdPartyApiController;
 use App\Http\Controllers\OutboundSyncController;
+use App\Http\Controllers\SqlQueryController;
 use App\Http\Controllers\StockTransactionReconciliationController;
 use App\Http\Controllers\ThirdPartyApiBatchController;
 use App\Http\Controllers\ThirdPartyApiController;
@@ -128,6 +129,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('outbound-sync.index');
     Route::post('outbound-sync/fetch', [OutboundSyncController::class, 'fetch'])
         ->name('outbound-sync.fetch');
+
+    Route::get('sql-queries', [SqlQueryController::class, 'index'])
+        ->name('sql-queries.index');
+    Route::post('sql-queries', [SqlQueryController::class, 'store'])
+        ->name('sql-queries.store');
+    Route::put('sql-queries/{savedSqlQuery}', [SqlQueryController::class, 'update'])
+        ->name('sql-queries.update');
+    Route::delete('sql-queries/{savedSqlQuery}', [SqlQueryController::class, 'destroy'])
+        ->name('sql-queries.destroy');
+    Route::get('sql-queries/{savedSqlQuery}/export', [SqlQueryController::class, 'export'])
+        ->name('sql-queries.export');
+    Route::post('sql-queries/import', [SqlQueryController::class, 'import'])
+        ->name('sql-queries.import');
 });
 
 require __DIR__.'/settings.php';

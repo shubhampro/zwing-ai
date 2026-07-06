@@ -29,6 +29,7 @@ import { index as expenseCashReconciliationIndex } from '@/routes/expense-cash-r
 import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconciliation';
 import { index as inboundEventsRunnerIndex } from '@/routes/inbound-events-runner';
 import { index as outboundSyncIndex } from '@/routes/outbound-sync';
+import { index as sqlQueriesIndex } from '@/routes/sql-queries';
 import { index as stockTransactionReconciliationIndex } from '@/routes/stock-transaction-reconciliation';
 import { index as transactionCheckerIndex } from '@/routes/transaction-checker';
 import { index as organizationsIndex } from '@/routes/organizations';
@@ -86,6 +87,11 @@ const mainNavItems: NavItem[] = [
         title: 'Outbound Sync',
         href: outboundSyncIndex.url(),
         icon: CloudUpload,
+    },
+    {
+        title: 'SQL Queries',
+        href: sqlQueriesIndex.url(),
+        icon: Database,
     },
 ];
 

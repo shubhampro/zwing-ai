@@ -5,6 +5,7 @@ import {
     Building2,
     ClipboardCheck,
     CloudUpload,
+    Database,
     FileText,
     PlayCircle,
     Plug,
@@ -41,6 +42,7 @@ import {
     report as invoiceReport,
 } from '@/routes/invoice-reconciliation';
 import { index as outboundSyncIndex } from '@/routes/outbound-sync';
+import { index as sqlQueriesIndex } from '@/routes/sql-queries';
 import { index as organizationsIndex } from '@/routes/organizations';
 import {
     create as stockCreate,
@@ -170,6 +172,13 @@ const toolGroups: ToolGroup[] = [
                 href: outboundSyncIndex.url(),
                 icon: CloudUpload,
                 accent: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+            },
+            {
+                title: 'SQL Queries',
+                description: 'Save, export, and reuse SQL with autocomplete.',
+                href: sqlQueriesIndex.url(),
+                icon: Database,
+                accent: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
             },
         ],
     },
