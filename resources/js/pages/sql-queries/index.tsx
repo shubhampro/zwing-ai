@@ -1,5 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
+    AlignLeft,
     Copy,
     Download,
     FileText,
@@ -21,7 +22,7 @@ import {
     update,
 } from '@/actions/App/Http/Controllers/SqlQueryController';
 import Heading from '@/components/heading';
-import SqlEditor from '@/components/sql-editor';
+import SqlEditor, { type SqlEditorHandle } from '@/components/sql-editor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,6 +37,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/copy-to-clipboard';
+import { formatSql } from '@/lib/format-sql';
 import { dashboard } from '@/routes';
 import { index } from '@/routes/sql-queries';
 
@@ -67,6 +69,7 @@ export default function SqlQueriesIndex({
     schemaTables,
 }: SqlQueriesIndexProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const sqlEditorRef = useRef<SqlEditorHandle>(null);
     const [activeId, setActiveId] = useState<number | null>(
         queries[0]?.id ?? null,
     );
@@ -160,12 +163,47 @@ export default function SqlQueriesIndex({
         });
     }
 
-    async function handleCopySql() {
-        const copied = await copyToClipboard(data.sql);
+    async function handleCopy() {
+        const copyText = sqlEditorRef.current?.getCopyText() ?? data.sql;
+        const copied = await copyToClipboard(copyText);
+
+        if (!copied) {
+            return;
+        }
+
+        const hasSelection = sqlEditorRef.current?.hasSelection() ?? false;
+        toast.success(
+            hasSelection
+                ? 'Selected SQL copied to clipboard.'
+                : 'SQL copied to clipboard.',
+        );
+    }
+
+    async function handleCopySavedQuery(query: SavedQuery) {
+        const copied = await copyToClipboard(query.sql);
 
         if (copied) {
-            toast.success('SQL copied to clipboard.');
+            toast.success(`"${query.title}" copied to clipboard.`);
         }
+    }
+
+    function handleFormatSql() {
+        const result = formatSql(data.sql);
+
+        if (!result.success) {
+            toast.error(result.message);
+
+            return;
+        }
+
+        if (result.sql === data.sql.trim()) {
+            toast.message('SQL is already formatted.');
+
+            return;
+        }
+
+        setData('sql', result.sql);
+        toast.success('SQL formatted.');
     }
 
     function handleExport() {
@@ -292,10 +330,18 @@ export default function SqlQueriesIndex({
                         <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => void handleCopySql()}
+                            onClick={handleFormatSql}
+                        >
+                            <AlignLeft className="size-4" />
+                            Format SQL
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void handleCopy()}
                         >
                             <Copy className="size-4" />
-                            Copy SQL
+                            Copy
                         </Button>
                         <Button
                             size="sm"
@@ -374,39 +420,56 @@ export default function SqlQueriesIndex({
                             )}
 
                             {queries.map((query) => (
-                                <button
+                                <div
                                     key={query.id}
-                                    type="button"
-                                    onClick={() => loadQuery(query)}
                                     className={cn(
-                                        'rounded-md border px-3 py-2 text-left transition-colors',
+                                        'group flex items-start gap-0.5 rounded-md border transition-colors',
                                         activeId === query.id
                                             ? 'border-primary/30 bg-primary/10 ring-1 ring-primary/20'
                                             : 'border-transparent hover:bg-muted/70',
                                     )}
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <FileText
-                                            className={cn(
-                                                'size-3.5 shrink-0',
-                                                activeId === query.id
-                                                    ? 'text-primary'
-                                                    : 'text-muted-foreground',
-                                            )}
-                                        />
-                                        <p className="truncate text-sm font-medium">
-                                            {query.title}
+                                    <button
+                                        type="button"
+                                        onClick={() => loadQuery(query)}
+                                        className="min-w-0 flex-1 px-3 py-2 text-left"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <FileText
+                                                className={cn(
+                                                    'size-3.5 shrink-0',
+                                                    activeId === query.id
+                                                        ? 'text-primary'
+                                                        : 'text-muted-foreground',
+                                                )}
+                                            />
+                                            <p className="truncate text-sm font-medium">
+                                                {query.title}
+                                            </p>
+                                        </div>
+                                        {query.description && (
+                                            <p className="mt-0.5 truncate pl-5 text-xs text-muted-foreground">
+                                                {query.description}
+                                            </p>
+                                        )}
+                                        <p className="mt-1 pl-5 text-[11px] text-muted-foreground">
+                                            {formatUpdatedAt(query.updated_at)}
                                         </p>
-                                    </div>
-                                    {query.description && (
-                                        <p className="mt-0.5 truncate pl-5 text-xs text-muted-foreground">
-                                            {query.description}
-                                        </p>
-                                    )}
-                                    <p className="mt-1 pl-5 text-[11px] text-muted-foreground">
-                                        {formatUpdatedAt(query.updated_at)}
-                                    </p>
-                                </button>
+                                    </button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="mt-1 mr-1 size-7 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
+                                        title={`Copy "${query.title}" SQL`}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            void handleCopySavedQuery(query);
+                                        }}
+                                    >
+                                        <Copy className="size-3.5" />
+                                    </Button>
+                                </div>
                             ))}
                         </div>
                     </aside>
@@ -503,11 +566,12 @@ export default function SqlQueriesIndex({
                             <div className="flex items-center justify-between">
                                 <Label>SQL</Label>
                                 <p className="text-xs text-muted-foreground">
-                                    Ctrl+Space for suggestions · common Zwing
-                                    tables included
+                                    Select text to copy one query · Ctrl+Space
+                                    for suggestions
                                 </p>
                             </div>
                             <SqlEditor
+                                ref={sqlEditorRef}
                                 value={data.sql}
                                 onChange={(value) => setData('sql', value)}
                                 schemaTables={schemaTables}

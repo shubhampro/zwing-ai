@@ -1,12 +1,17 @@
 import Editor, { type Monaco } from '@monaco-editor/react';
 import type { languages, Position, editor } from 'monaco-editor';
-import { useCallback, useRef } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 
 type SqlEditorProps = {
     value: string;
     onChange: (value: string) => void;
     schemaTables?: string[];
     height?: string;
+};
+
+export type SqlEditorHandle = {
+    getCopyText: () => string;
+    hasSelection: () => boolean;
 };
 
 function registerSqlCompletions(
@@ -42,16 +47,60 @@ function registerSqlCompletions(
     return disposable;
 }
 
-export default function SqlEditor({
-    value,
-    onChange,
-    schemaTables = [],
-    height = '420px',
-}: SqlEditorProps) {
+function getSelectedText(
+    editorInstance: editor.IStandaloneCodeEditor,
+): string | null {
+    const selection = editorInstance.getSelection();
+    const model = editorInstance.getModel();
+
+    if (selection === null || model === null || selection.isEmpty()) {
+        return null;
+    }
+
+    return model.getValueInRange(selection);
+}
+
+const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function SqlEditor(
+    { value, onChange, schemaTables = [], height = '420px' },
+    ref,
+) {
+    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const completionDisposable = useRef<{ dispose: () => void } | null>(null);
 
+    useImperativeHandle(
+        ref,
+        () => ({
+            getCopyText: () => {
+                const editorInstance = editorRef.current;
+
+                if (editorInstance === null) {
+                    return value;
+                }
+
+                const selectedText = getSelectedText(editorInstance);
+
+                if (selectedText !== null) {
+                    return selectedText;
+                }
+
+                return editorInstance.getValue();
+            },
+            hasSelection: () => {
+                const editorInstance = editorRef.current;
+
+                if (editorInstance === null) {
+                    return false;
+                }
+
+                return getSelectedText(editorInstance) !== null;
+            },
+        }),
+        [value],
+    );
+
     const handleMount = useCallback(
-        (_editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+        (editorInstance: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+            editorRef.current = editorInstance;
             completionDisposable.current?.dispose();
 
             if (schemaTables.length > 0) {
@@ -92,4 +141,6 @@ export default function SqlEditor({
             />
         </div>
     );
-}
+});
+
+export default SqlEditor;
