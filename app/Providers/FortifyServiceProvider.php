@@ -28,6 +28,8 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Fortify::redirects('logout', '/login');
+
         $this->configureActions();
         $this->configureViews();
         $this->configureRateLimiting();
