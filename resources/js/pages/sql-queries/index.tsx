@@ -1,11 +1,14 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     AlignLeft,
+    ArrowLeft,
     Copy,
+    Database,
     Download,
     FileText,
     FileUp,
     Loader2,
+    MoreHorizontal,
     PenLine,
     Plus,
     Save,
@@ -33,6 +36,13 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -54,6 +64,8 @@ type SqlQueriesIndexProps = {
     schemaTables: string[];
 };
 
+type View = 'list' | 'editor';
+
 const EMPTY_SQL = '-- Write your SQL query here\nSELECT * FROM grn\nWHERE id = 1;';
 
 function formatUpdatedAt(value: string | null): string {
@@ -61,7 +73,10 @@ function formatUpdatedAt(value: string | null): string {
         return '';
     }
 
-    return new Date(value).toLocaleString();
+    return new Date(value).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
 }
 
 export default function SqlQueriesIndex({
@@ -70,9 +85,8 @@ export default function SqlQueriesIndex({
 }: SqlQueriesIndexProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const sqlEditorRef = useRef<SqlEditorHandle>(null);
-    const [activeId, setActiveId] = useState<number | null>(
-        queries[0]?.id ?? null,
-    );
+    const [view, setView] = useState<View>('list');
+    const [activeId, setActiveId] = useState<number | null>(null);
     const [deletingQuery, setDeletingQuery] = useState<SavedQuery | null>(null);
     const [importing, setImporting] = useState(false);
 
@@ -81,9 +95,9 @@ export default function SqlQueriesIndex({
 
     const { data, setData, post, put, processing, errors, clearErrors } =
         useForm({
-            title: activeQuery?.title ?? 'Untitled query',
-            description: activeQuery?.description ?? '',
-            sql: activeQuery?.sql ?? EMPTY_SQL,
+            title: 'Untitled query',
+            description: '',
+            sql: EMPTY_SQL,
         });
 
     const isDirty =
@@ -95,7 +109,7 @@ export default function SqlQueriesIndex({
               (data.description ?? '') !== (activeQuery.description ?? '') ||
               data.sql !== activeQuery.sql;
 
-    const loadQuery = useCallback(
+    const openQuery = useCallback(
         (query: SavedQuery | null) => {
             if (query) {
                 setActiveId(query.id);
@@ -114,12 +128,18 @@ export default function SqlQueriesIndex({
             }
 
             clearErrors();
+            setView('editor');
         },
         [clearErrors, setData],
     );
 
     function handleNewQuery() {
-        loadQuery(null);
+        openQuery(null);
+    }
+
+    function handleBackToList() {
+        setView('list');
+        clearErrors();
     }
 
     function handleSave() {
@@ -128,6 +148,7 @@ export default function SqlQueriesIndex({
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success('Query saved.');
+                    setView('list');
                 },
             });
 
@@ -138,6 +159,7 @@ export default function SqlQueriesIndex({
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Query updated.');
+                setView('list');
             },
         });
     }
@@ -147,17 +169,17 @@ export default function SqlQueriesIndex({
             return;
         }
 
-        router.delete(destroyAction.url(deletingQuery.id), {
+        const deletingId = deletingQuery.id;
+
+        router.delete(destroyAction.url(deletingId), {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Query deleted.');
                 setDeletingQuery(null);
 
-                if (activeId === deletingQuery.id) {
-                    const remaining = queries.filter(
-                        (query) => query.id !== deletingQuery.id,
-                    );
-                    loadQuery(remaining[0] ?? null);
+                if (activeId === deletingId) {
+                    setActiveId(null);
+                    setView('list');
                 }
             },
         });
@@ -279,327 +301,366 @@ export default function SqlQueriesIndex({
             <Head title="SQL Queries" />
 
             <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <Heading
-                        title="SQL Queries"
-                        description="Save, reuse, and share SQL queries with autocomplete for common Zwing tables."
-                    />
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            size="sm"
-                            variant={isNewQuery ? 'default' : 'outline'}
-                            onClick={handleNewQuery}
-                        >
-                            <Plus className="size-4" />
-                            New query
-                        </Button>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".sql,.txt"
-                            className="hidden"
-                            onChange={(event) => {
-                                const file = event.target.files?.[0];
-
-                                if (file) {
-                                    void handleImportFile(file);
-                                }
-                            }}
-                        />
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={importing}
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            {importing ? (
-                                <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                                <FileUp className="size-4" />
-                            )}
-                            Import
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleExport}
-                        >
-                            <Download className="size-4" />
-                            Export
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleFormatSql}
-                        >
-                            <AlignLeft className="size-4" />
-                            Format SQL
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void handleCopy()}
-                        >
-                            <Copy className="size-4" />
-                            Copy
-                        </Button>
-                        <Button
-                            size="sm"
-                            onClick={handleSave}
-                            disabled={processing || !isDirty}
-                        >
-                            {processing ? (
-                                <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                                <Save className="size-4" />
-                            )}
-                            {isNewQuery ? 'Save query' : 'Update query'}
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-                    <aside className="flex flex-col gap-3 rounded-lg border border-sidebar-border/70 p-3 dark:border-sidebar-border">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-medium">
-                                Saved queries
-                            </h3>
-                            <span className="text-xs text-muted-foreground">
-                                {queries.length}
-                            </span>
-                        </div>
-
-                        <div className="flex max-h-[520px] flex-col gap-1 overflow-y-auto">
-                            <button
-                                type="button"
-                                onClick={handleNewQuery}
-                                className={cn(
-                                    'rounded-md border px-3 py-2.5 text-left transition-colors',
-                                    isNewQuery
-                                        ? 'border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/20'
-                                        : 'border-dashed border-muted-foreground/25 hover:border-muted-foreground/40 hover:bg-muted/50',
-                                )}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <Sparkles
-                                        className={cn(
-                                            'size-4 shrink-0',
-                                            isNewQuery
-                                                ? 'text-emerald-600 dark:text-emerald-400'
-                                                : 'text-muted-foreground',
-                                        )}
-                                    />
-                                    <span className="truncate text-sm font-medium">
-                                        New query
-                                    </span>
-                                    {isNewQuery && (
-                                        <Badge className="ml-auto bg-emerald-600 hover:bg-emerald-600">
-                                            Draft
-                                        </Badge>
-                                    )}
-                                </div>
-                                <p className="mt-0.5 pl-6 text-xs text-muted-foreground">
-                                    Start from scratch
-                                </p>
-                            </button>
-
-                            {queries.length > 0 && (
-                                <>
-                                    <div className="my-2 border-t border-sidebar-border/70" />
-                                    <p className="px-1 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                                        Saved
-                                    </p>
-                                </>
-                            )}
-
-                            {queries.length === 0 && (
-                                <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                    No saved queries yet. Your first save will
-                                    appear here.
-                                </p>
-                            )}
-
-                            {queries.map((query) => (
-                                <div
-                                    key={query.id}
-                                    className={cn(
-                                        'group flex items-start gap-0.5 rounded-md border transition-colors',
-                                        activeId === query.id
-                                            ? 'border-primary/30 bg-primary/10 ring-1 ring-primary/20'
-                                            : 'border-transparent hover:bg-muted/70',
-                                    )}
-                                >
-                                    <button
-                                        type="button"
-                                        onClick={() => loadQuery(query)}
-                                        className="min-w-0 flex-1 px-3 py-2 text-left"
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <FileText
-                                                className={cn(
-                                                    'size-3.5 shrink-0',
-                                                    activeId === query.id
-                                                        ? 'text-primary'
-                                                        : 'text-muted-foreground',
-                                                )}
-                                            />
-                                            <p className="truncate text-sm font-medium">
-                                                {query.title}
-                                            </p>
-                                        </div>
-                                        {query.description && (
-                                            <p className="mt-0.5 truncate pl-5 text-xs text-muted-foreground">
-                                                {query.description}
-                                            </p>
-                                        )}
-                                        <p className="mt-1 pl-5 text-[11px] text-muted-foreground">
-                                            {formatUpdatedAt(query.updated_at)}
-                                        </p>
-                                    </button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="mt-1 mr-1 size-7 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
-                                        title={`Copy "${query.title}" SQL`}
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            void handleCopySavedQuery(query);
-                                        }}
-                                    >
-                                        <Copy className="size-3.5" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    </aside>
-
-                    <div
-                        className={cn(
-                            'flex flex-col gap-4 rounded-xl border p-4 md:p-5',
-                            isNewQuery
-                                ? 'border-emerald-500/30 bg-emerald-500/[0.03]'
-                                : 'border-primary/20 bg-primary/[0.02]',
-                        )}
-                    >
-                        <div className="flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="space-y-1.5">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    {isNewQuery ? (
-                                        <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-600">
-                                            <Sparkles className="size-3" />
-                                            New query
-                                        </Badge>
-                                    ) : (
-                                        <Badge
-                                            variant="secondary"
-                                            className="gap-1"
-                                        >
-                                            <PenLine className="size-3" />
-                                            Editing saved query
-                                        </Badge>
-                                    )}
-                                    {isDirty && (
-                                        <Badge variant="outline">
-                                            Unsaved changes
-                                        </Badge>
-                                    )}
-                                </div>
-                                <h2 className="text-lg font-semibold tracking-tight">
-                                    {isNewQuery
-                                        ? 'Create a new SQL query'
-                                        : data.title}
-                                </h2>
-                                <p className="text-sm text-muted-foreground">
-                                    {isNewQuery
-                                        ? 'Write your SQL below, then save it to your library.'
-                                        : activeQuery?.updated_at
-                                          ? `Last updated ${formatUpdatedAt(activeQuery.updated_at)}`
-                                          : 'Update the fields below and click Update query.'}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="query-title">Title</Label>
-                                <Input
-                                    id="query-title"
-                                    value={data.title}
-                                    onChange={(event) =>
-                                        setData('title', event.target.value)
-                                    }
-                                    placeholder="GRN pending sync check"
-                                />
-                                {errors.title && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.title}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="space-y-2 sm:col-span-1">
-                                <Label htmlFor="query-description">
-                                    Description (optional)
-                                </Label>
-                                <textarea
-                                    id="query-description"
-                                    value={data.description}
-                                    onChange={(event) =>
-                                        setData(
-                                            'description',
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder="Notes for teammates…"
-                                    rows={2}
-                                    className="border-input placeholder:text-muted-foreground flex min-h-[60px] w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"
-                                />
-                                {errors.description && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.description}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label>SQL</Label>
-                                <p className="text-xs text-muted-foreground">
-                                    Select text to copy one query · Ctrl+Space
-                                    for suggestions
-                                </p>
-                            </div>
-                            <SqlEditor
-                                ref={sqlEditorRef}
-                                value={data.sql}
-                                onChange={(value) => setData('sql', value)}
-                                schemaTables={schemaTables}
-                                height="460px"
+                {view === 'list' ? (
+                    <>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <Heading
+                                title="SQL Queries"
+                                description="Save, reuse, and share SQL queries with autocomplete for common Zwing tables."
                             />
-                            {errors.sql && (
-                                <p className="text-sm text-destructive">
-                                    {errors.sql}
-                                </p>
-                            )}
+                            <Button size="sm" onClick={handleNewQuery}>
+                                <Plus className="size-4" />
+                                New query
+                            </Button>
                         </div>
 
-                        {activeQuery && (
-                            <div className="flex justify-end">
+                        <div className="overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
+                            <table className="w-full min-w-[640px] text-left text-sm">
+                                <thead className="bg-muted/50 text-muted-foreground">
+                                    <tr>
+                                        <th className="px-4 py-2.5 font-medium">
+                                            Title
+                                        </th>
+                                        <th className="px-4 py-2.5 font-medium">
+                                            Description
+                                        </th>
+                                        <th className="px-4 py-2.5 font-medium">
+                                            Last updated
+                                        </th>
+                                        <th className="px-4 py-2.5 text-right font-medium">
+                                            <span className="sr-only">
+                                                Actions
+                                            </span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {queries.length === 0 && (
+                                        <tr>
+                                            <td colSpan={4}>
+                                                <div className="flex flex-col items-center gap-3 px-4 py-14 text-center">
+                                                    <div className="flex size-11 items-center justify-center rounded-full bg-muted">
+                                                        <Database className="size-5 text-muted-foreground" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="text-sm font-medium">
+                                                            No saved queries yet
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Create your first
+                                                            query to build your
+                                                            reusable library.
+                                                        </p>
+                                                    </div>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={handleNewQuery}
+                                                    >
+                                                        <Plus className="size-4" />
+                                                        New query
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {queries.map((query) => (
+                                        <tr
+                                            key={query.id}
+                                            onClick={() => openQuery(query)}
+                                            className="cursor-pointer border-t border-sidebar-border/70 transition-colors hover:bg-muted/50 dark:border-sidebar-border"
+                                        >
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2.5">
+                                                    <FileText className="size-4 shrink-0 text-muted-foreground" />
+                                                    <span className="font-medium">
+                                                        {query.title}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="max-w-[360px] px-4 py-3 text-muted-foreground">
+                                                <span className="line-clamp-1">
+                                                    {query.description || '—'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                                                {formatUpdatedAt(
+                                                    query.updated_at,
+                                                ) || '—'}
+                                            </td>
+                                            <td
+                                                className="px-4 py-3 text-right"
+                                                onClick={(event) =>
+                                                    event.stopPropagation()
+                                                }
+                                            >
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="cursor-pointer"
+                                                        >
+                                                            <MoreHorizontal className="size-4" />
+                                                            <span className="sr-only">
+                                                                Actions
+                                                            </span>
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem
+                                                            onSelect={() =>
+                                                                openQuery(query)
+                                                            }
+                                                        >
+                                                            <PenLine className="size-4" />
+                                                            Edit
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onSelect={() =>
+                                                                void handleCopySavedQuery(
+                                                                    query,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Copy className="size-4" />
+                                                            Copy SQL
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            className="text-destructive focus:text-destructive"
+                                                            onSelect={() =>
+                                                                setDeletingQuery(
+                                                                    query,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash2 className="size-4" />
+                                                            Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-3">
+                                <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="mt-0.5 shrink-0"
+                                    onClick={handleBackToList}
+                                    aria-label="Back to queries"
+                                >
+                                    <ArrowLeft className="size-4" />
+                                </Button>
+                                <Heading
+                                    title={
+                                        isNewQuery
+                                            ? 'New SQL query'
+                                            : 'Edit SQL query'
+                                    }
+                                    description="Write your SQL below with autocomplete for common Zwing tables."
+                                />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".sql,.txt"
+                                    className="hidden"
+                                    onChange={(event) => {
+                                        const file = event.target.files?.[0];
+
+                                        if (file) {
+                                            void handleImportFile(file);
+                                        }
+                                    }}
+                                />
                                 <Button
                                     size="sm"
-                                    variant="destructive"
-                                    onClick={() =>
-                                        setDeletingQuery(activeQuery)
-                                    }
+                                    variant="outline"
+                                    disabled={importing}
+                                    onClick={() => fileInputRef.current?.click()}
                                 >
-                                    <Trash2 className="size-4" />
-                                    Delete query
+                                    {importing ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <FileUp className="size-4" />
+                                    )}
+                                    Import
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleExport}
+                                >
+                                    <Download className="size-4" />
+                                    Export
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleFormatSql}
+                                >
+                                    <AlignLeft className="size-4" />
+                                    Format SQL
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => void handleCopy()}
+                                >
+                                    <Copy className="size-4" />
+                                    Copy
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={handleSave}
+                                    disabled={processing || !isDirty}
+                                >
+                                    {processing ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <Save className="size-4" />
+                                    )}
+                                    {isNewQuery ? 'Save query' : 'Update query'}
                                 </Button>
                             </div>
-                        )}
-                    </div>
-                </div>
+                        </div>
+
+                        <div
+                            className={cn(
+                                'flex flex-col gap-4 rounded-xl border p-4 md:p-5',
+                                isNewQuery
+                                    ? 'border-emerald-500/30 bg-emerald-500/[0.03]'
+                                    : 'border-primary/20 bg-primary/[0.02]',
+                            )}
+                        >
+                            <div className="flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="space-y-1.5">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {isNewQuery ? (
+                                            <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-600">
+                                                <Sparkles className="size-3" />
+                                                New query
+                                            </Badge>
+                                        ) : (
+                                            <Badge
+                                                variant="secondary"
+                                                className="gap-1"
+                                            >
+                                                <PenLine className="size-3" />
+                                                Editing saved query
+                                            </Badge>
+                                        )}
+                                        {isDirty && (
+                                            <Badge variant="outline">
+                                                Unsaved changes
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <h2 className="text-lg font-semibold tracking-tight">
+                                        {isNewQuery
+                                            ? 'Create a new SQL query'
+                                            : data.title}
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        {isNewQuery
+                                            ? 'Write your SQL below, then save it to your library.'
+                                            : activeQuery?.updated_at
+                                              ? `Last updated ${formatUpdatedAt(activeQuery.updated_at)}`
+                                              : 'Update the fields below and click Update query.'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="query-title">Title</Label>
+                                    <Input
+                                        id="query-title"
+                                        value={data.title}
+                                        onChange={(event) =>
+                                            setData('title', event.target.value)
+                                        }
+                                        placeholder="GRN pending sync check"
+                                    />
+                                    {errors.title && (
+                                        <p className="text-sm text-destructive">
+                                            {errors.title}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="space-y-2 sm:col-span-1">
+                                    <Label htmlFor="query-description">
+                                        Description (optional)
+                                    </Label>
+                                    <textarea
+                                        id="query-description"
+                                        value={data.description}
+                                        onChange={(event) =>
+                                            setData(
+                                                'description',
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Notes for teammates…"
+                                        rows={2}
+                                        className="border-input placeholder:text-muted-foreground flex min-h-[60px] w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"
+                                    />
+                                    {errors.description && (
+                                        <p className="text-sm text-destructive">
+                                            {errors.description}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label>SQL</Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Select text to copy one query · Ctrl+Space
+                                        for suggestions
+                                    </p>
+                                </div>
+                                <SqlEditor
+                                    ref={sqlEditorRef}
+                                    value={data.sql}
+                                    onChange={(value) => setData('sql', value)}
+                                    schemaTables={schemaTables}
+                                    height="460px"
+                                />
+                                {errors.sql && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.sql}
+                                    </p>
+                                )}
+                            </div>
+
+                            {activeQuery && (
+                                <div className="flex justify-end">
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() =>
+                                            setDeletingQuery(activeQuery)
+                                        }
+                                    >
+                                        <Trash2 className="size-4" />
+                                        Delete query
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
             </div>
 
             <Dialog
