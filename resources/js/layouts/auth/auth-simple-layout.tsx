@@ -1,5 +1,12 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import AppLogoIcon from '@/components/app-logo-icon';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { home } from '@/routes';
 import type { AuthLayoutProps } from '@/types';
 
@@ -8,30 +15,37 @@ export default function AuthSimpleLayout({
     title,
     description,
 }: AuthLayoutProps) {
+    const { name } = usePage().props;
+
     return (
-        <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
-            <div className="w-full max-w-sm">
-                <div className="flex flex-col gap-8">
-                    <div className="flex flex-col items-center gap-4">
+        <div className="flex min-h-svh flex-col items-center justify-center bg-muted/50 p-6 md:p-10">
+            <div className="w-full max-w-[420px]">
+                <Card className="border-border/60 shadow-lg shadow-black/5">
+                    <CardHeader className="space-y-4 pb-2 text-center">
                         <Link
                             href={home()}
-                            className="flex flex-col items-center gap-2 font-medium"
+                            className="mx-auto flex items-center justify-center gap-2.5"
                         >
-                            <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-md">
-                                <AppLogoIcon className="size-9 fill-current text-[var(--foreground)] dark:text-white" />
-                            </div>
-                            <span className="sr-only">{title}</span>
+                            <AppLogoIcon className="size-10" />
+                            <span className="text-lg font-bold tracking-tight text-foreground">
+                                {name}
+                            </span>
                         </Link>
 
-                        <div className="space-y-2 text-center">
-                            <h1 className="text-xl font-medium">{title}</h1>
-                            <p className="text-center text-sm text-muted-foreground">
-                                {description}
-                            </p>
+                        <div className="space-y-1.5">
+                            <CardTitle className="text-2xl tracking-tight">
+                                {title}
+                            </CardTitle>
+                            {description && (
+                                <CardDescription className="text-balance">
+                                    {description}
+                                </CardDescription>
+                            )}
                         </div>
-                    </div>
-                    {children}
-                </div>
+                    </CardHeader>
+
+                    <CardContent className="pt-2">{children}</CardContent>
+                </Card>
             </div>
         </div>
     );
