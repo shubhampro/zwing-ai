@@ -7,6 +7,7 @@ use App\Http\Controllers\InvoiceReconciliationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationThirdPartyApiController;
 use App\Http\Controllers\OutboundSyncController;
+use App\Http\Controllers\PrintInvoiceController;
 use App\Http\Controllers\SqlQueryController;
 use App\Http\Controllers\StockTransactionReconciliationController;
 use App\Http\Controllers\ThirdPartyApiBatchController;
@@ -130,6 +131,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('outbound-sync.index');
     Route::post('outbound-sync/fetch', [OutboundSyncController::class, 'fetch'])
         ->name('outbound-sync.fetch');
+
+    Route::get('print-invoice', [PrintInvoiceController::class, 'index'])
+        ->name('print-invoice.index');
+    Route::post('print-invoice/preview', [PrintInvoiceController::class, 'preview'])
+        ->name('print-invoice.preview');
 
     Route::get('sql-queries', [SqlQueryController::class, 'index'])
         ->name('sql-queries.index');
