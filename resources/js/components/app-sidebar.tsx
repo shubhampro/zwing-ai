@@ -7,6 +7,7 @@ import {
     Database,
     FileText,
     LayoutGrid,
+    LayoutTemplate,
     PlayCircle,
     Printer,
     Wallet,
@@ -33,6 +34,7 @@ import { index as outboundSyncIndex } from '@/routes/outbound-sync';
 import { index as printInvoiceIndex } from '@/routes/print-invoice';
 import { index as sqlQueriesIndex } from '@/routes/sql-queries';
 import { index as stockTransactionReconciliationIndex } from '@/routes/stock-transaction-reconciliation';
+import { index as templateBuilderIndex } from '@/routes/template-builder';
 import { index as transactionCheckerIndex } from '@/routes/transaction-checker';
 import { index as organizationsIndex } from '@/routes/organizations';
 import { index as thirdPartyApiBatchesIndex } from '@/routes/third-party-api-batches';
@@ -94,6 +96,11 @@ const mainNavItems: NavItem[] = [
         title: 'Print Invoice',
         href: printInvoiceIndex.url(),
         icon: Printer,
+    },
+    {
+        title: 'Template Builder',
+        href: templateBuilderIndex.url(),
+        icon: LayoutTemplate,
     },
     {
         title: 'SQL Queries',

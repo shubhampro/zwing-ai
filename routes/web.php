@@ -10,6 +10,8 @@ use App\Http\Controllers\OutboundSyncController;
 use App\Http\Controllers\PrintInvoiceController;
 use App\Http\Controllers\SqlQueryController;
 use App\Http\Controllers\StockTransactionReconciliationController;
+use App\Http\Controllers\TemplateBuilderController;
+use App\Http\Controllers\TemplateBuilderVisionImportController;
 use App\Http\Controllers\ThirdPartyApiBatchController;
 use App\Http\Controllers\ThirdPartyApiController;
 use App\Http\Controllers\TransactionCheckerController;
@@ -136,6 +138,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('print-invoice.index');
     Route::post('print-invoice/preview', [PrintInvoiceController::class, 'preview'])
         ->name('print-invoice.preview');
+
+    Route::get('template-builder', TemplateBuilderController::class)
+        ->name('template-builder.index');
+
+    Route::post('template-builder/import-vision', TemplateBuilderVisionImportController::class)
+        ->middleware('throttle:5,1')
+        ->name('template-builder.import-vision');
 
     Route::get('sql-queries', [SqlQueryController::class, 'index'])
         ->name('sql-queries.index');
