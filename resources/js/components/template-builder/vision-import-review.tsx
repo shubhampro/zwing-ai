@@ -10,6 +10,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { ScaledA4IframePreview } from '@/components/template-builder/scaled-a4-iframe-preview';
 import { renderImportedEjsPrintDocument } from '@/lib/template-builder/a4-ejs-preview';
 import type { VisionImportResponse } from '@/lib/template-builder/vision-import';
 import { cn } from '@/lib/utils';
@@ -75,7 +76,7 @@ export function VisionImportReview({
                 )}
 
                 <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2">
-                    <div className="flex min-h-0 flex-col gap-2">
+                    <div className="flex min-h-0 min-w-0 flex-col gap-2">
                         <p className="text-xs font-medium text-muted-foreground">Reference image</p>
                         <div className="min-h-0 flex-1 overflow-auto rounded-lg border bg-muted/20 p-2">
                             {referenceImageUrl ? (
@@ -90,7 +91,7 @@ export function VisionImportReview({
                         </div>
                     </div>
 
-                    <div className="flex min-h-0 flex-col gap-2">
+                    <div className="flex min-h-0 min-w-0 flex-col gap-2">
                         <p className="text-xs font-medium text-muted-foreground">
                             Generated preview
                             {result?.provider && result.model && (
@@ -101,7 +102,7 @@ export function VisionImportReview({
                         </p>
                         <div
                             className={cn(
-                                'min-h-[320px] flex-1 overflow-auto rounded-lg border bg-muted/20',
+                                'min-h-[320px] flex-1 overflow-y-auto overflow-x-hidden rounded-lg border bg-muted/20 p-2',
                                 loading && 'opacity-60',
                             )}
                         >
@@ -111,11 +112,10 @@ export function VisionImportReview({
                                     Generating EJS from image…
                                 </div>
                             ) : previewDocument ? (
-                                <iframe
+                                <ScaledA4IframePreview
                                     title="Vision import preview"
                                     srcDoc={previewDocument}
-                                    className="block min-h-[600px] min-w-[794px] w-full bg-white"
-                                    sandbox="allow-same-origin"
+                                    className="mx-auto"
                                 />
                             ) : (
                                 <p className="p-4 text-center text-sm text-muted-foreground">
