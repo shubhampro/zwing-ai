@@ -3,6 +3,14 @@ import { ArrowLeft, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { dashboard } from '@/routes';
 import {
     erpLogs,
@@ -34,37 +42,57 @@ type Props = {
     rows: LogRow[];
     pagination: Pagination;
     search: string;
+    site_code: string;
+    siteCodeOptions: string[];
 };
+
+const ANY_SITE_CODE = '__any__';
 
 export default function StockTransactionReconciliationErpLogs({
     session,
     rows,
     pagination,
     search,
+    site_code: initialSiteCode,
+    siteCodeOptions,
 }: Props) {
     const [searchValue, setSearchValue] = useState(search);
+    const [siteCode, setSiteCode] = useState(initialSiteCode || ANY_SITE_CODE);
+
+    function buildQueryParams(page = 1) {
+        return {
+            search: searchValue,
+            site_code: siteCode === ANY_SITE_CODE ? '' : siteCode,
+            page,
+        };
+    }
 
     function applySearch(e: React.FormEvent) {
         e.preventDefault();
-        router.get(
-            erpLogs.url(session.id),
-            { search: searchValue, page: 1 },
-            { preserveScroll: false },
-        );
+        router.get(erpLogs.url(session.id), buildQueryParams(1), {
+            preserveScroll: false,
+        });
     }
 
-    function clearSearch() {
+    function clearFilters() {
         setSearchValue('');
+        setSiteCode(ANY_SITE_CODE);
         router.get(erpLogs.url(session.id), {}, { preserveScroll: false });
     }
 
     function goToPage(page: number) {
         router.get(
             erpLogs.url(session.id),
-            { search, page },
+            {
+                search,
+                site_code: initialSiteCode,
+                page,
+            },
             { preserveScroll: true },
         );
     }
+
+    const isFiltered = search !== '' || initialSiteCode !== '';
 
     return (
         <>
@@ -97,8 +125,26 @@ export default function StockTransactionReconciliationErpLogs({
 
                     <form
                         onSubmit={applySearch}
-                        className="flex items-center gap-2"
+                        className="flex flex-wrap items-end gap-2"
                     >
+                        <div className="space-y-1.5">
+                            <Label htmlFor="site-code-filter" className="sr-only">
+                                Site code
+                            </Label>
+                            <Select value={siteCode} onValueChange={setSiteCode}>
+                                <SelectTrigger id="site-code-filter" className="h-8 w-40">
+                                    <SelectValue placeholder="Any site code" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ANY_SITE_CODE}>Any site code</SelectItem>
+                                    {siteCodeOptions.map((option) => (
+                                        <SelectItem key={option} value={option}>
+                                            {option}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <div className="relative">
                             <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                             <Input
@@ -108,13 +154,16 @@ export default function StockTransactionReconciliationErpLogs({
                                 onChange={(e) => setSearchValue(e.target.value)}
                             />
                         </div>
-                        {search !== '' && (
+                        <Button type="submit" size="sm" className="h-8">
+                            Apply
+                        </Button>
+                        {isFiltered && (
                             <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                onClick={clearSearch}
-                                className="gap-1 text-muted-foreground"
+                                onClick={clearFilters}
+                                className="h-8 gap-1 text-muted-foreground"
                             >
                                 <X className="size-3.5" />
                                 Clear
@@ -161,8 +210,8 @@ export default function StockTransactionReconciliationErpLogs({
                                             colSpan={8}
                                             className="px-4 py-10 text-center text-sm text-muted-foreground"
                                         >
-                                            {search !== ''
-                                                ? 'No rows match your search.'
+                                            {search !== '' || initialSiteCode !== ''
+                                                ? 'No rows match your filters.'
                                                 : 'No log rows found for this session.'}
                                         </td>
                                     </tr>

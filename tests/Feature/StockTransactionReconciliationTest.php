@@ -2,6 +2,7 @@
 
 use App\Jobs\ParseStockReconciliationCsv;
 use App\Models\StockReconSession;
+use App\Models\StockReconZwingLog;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -325,18 +326,19 @@ test('report applies icode search, stock point filter, and difference filters', 
 
     DB::table('zwing_stock_reconsile')->insert([
         ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B1', 'barcode' => 'A', 'icode' => 'ND-SEARCH-001', 'stock_point_name' => 'Packet', 'site_code' => '10', 'sprefcode' => 3, 'qty' => 10, 'created_at' => $now, 'updated_at' => $now],
-        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B2', 'barcode' => 'A', 'icode' => 'ND-SEARCH-002', 'stock_point_name' => 'Shelf', 'site_code' => '10', 'sprefcode' => 1, 'qty' => 20, 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B2', 'barcode' => 'A', 'icode' => 'ND-SEARCH-002', 'stock_point_name' => 'Shelf', 'site_code' => '20', 'sprefcode' => 1, 'qty' => 20, 'created_at' => $now, 'updated_at' => $now],
     ]);
 
     DB::table('erp_stock_reconsile')->insert([
         ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B1', 'barcode' => 'A', 'icode' => 'ND-SEARCH-001', 'stock_point_name' => 'Packet', 'site_code' => '10', 'sprefcode' => 3, 'qty' => 12, 'created_at' => $now, 'updated_at' => $now],
-        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B2', 'barcode' => 'A', 'icode' => 'ND-SEARCH-002', 'stock_point_name' => 'SALE', 'site_code' => '10', 'sprefcode' => 1, 'qty' => 20, 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B2', 'barcode' => 'A', 'icode' => 'ND-SEARCH-002', 'stock_point_name' => 'SALE', 'site_code' => '20', 'sprefcode' => 1, 'qty' => 20, 'created_at' => $now, 'updated_at' => $now],
     ]);
 
     $this->actingAs($user)
         ->get(route('stock-transaction-reconciliation.report', [
             'stockReconSession' => $session,
             'icode_query' => '001',
+            'site_code' => '10',
             'stock_point' => 'Packet',
             'difference' => 'non_zero',
         ]))
@@ -345,10 +347,13 @@ test('report applies icode search, stock point filter, and difference filters', 
             ->component('stock-transaction-reconciliation/report')
             ->has('rows', 1)
             ->where('rows.0.icode', 'ND-SEARCH-001')
+            ->where('rows.0.site_code', '10')
             ->where('rows.0.match_status', 'qty_mismatch')
             ->where('filters.icode_query', '001')
+            ->where('filters.site_code', '10')
             ->where('filters.stock_point', 'Packet')
             ->where('filters.difference', 'non_zero')
+            ->where('siteCodeOptions', ['10', '20'])
             ->where('stockPointOptions', ['Packet', 'SALE', 'Shelf']));
 });
 
@@ -367,4 +372,51 @@ test('authenticated users can view zwing logs page', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('stock-transaction-reconciliation/zwing-logs')
             ->has('rows'));
+});
+
+test('zwing logs page applies site code filter', function () {
+    $user = User::factory()->create();
+    $session = StockReconSession::create([
+        'user_id' => $user->id,
+        'name' => 'logs-filter-session',
+        'v_id' => 1,
+        'status' => 'completed',
+    ]);
+
+    StockReconZwingLog::create([
+        'stock_recon_session_id' => $session->id,
+        'v_id' => 1,
+        'site_code' => '10',
+        'icode' => 'SKU-A',
+        'batch_no' => 'B1',
+        'sprefcode' => 'SPR1',
+        'doc_no' => 'D1',
+        'enttype' => 'GRN',
+        'qty' => 5,
+    ]);
+
+    StockReconZwingLog::create([
+        'stock_recon_session_id' => $session->id,
+        'v_id' => 1,
+        'site_code' => '20',
+        'icode' => 'SKU-B',
+        'batch_no' => 'B2',
+        'sprefcode' => 'SPR2',
+        'doc_no' => 'D2',
+        'enttype' => 'GRN',
+        'qty' => 8,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('stock-transaction-reconciliation.zwing-logs', [
+            'stockReconSession' => $session,
+            'site_code' => '10',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('stock-transaction-reconciliation/zwing-logs')
+            ->has('rows', 1)
+            ->where('rows.0.site_code', '10')
+            ->where('site_code', '10')
+            ->where('siteCodeOptions', ['10', '20']));
 });

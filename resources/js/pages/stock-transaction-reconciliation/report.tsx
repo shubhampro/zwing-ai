@@ -84,9 +84,11 @@ type Props = {
     filter: string;
     filters: {
         icode_query: string;
+        site_code: string;
         stock_point: string;
         difference: DifferenceFilter;
     };
+    siteCodeOptions: string[];
     stockPointOptions: string[];
 };
 
@@ -119,6 +121,7 @@ const differenceFilters: { value: DifferenceFilter; label: string }[] = [
 ];
 
 const ANY_STOCK_POINT = '__any__';
+const ANY_SITE_CODE = '__any__';
 
 function SummaryCard({
     label,
@@ -230,9 +233,11 @@ export default function StockTransactionReconciliationReport({
     pagination,
     filter,
     filters: initialFilters,
+    siteCodeOptions,
     stockPointOptions,
 }: Props) {
     const [icodeQuery, setIcodeQuery] = useState(initialFilters.icode_query);
+    const [siteCode, setSiteCode] = useState(initialFilters.site_code || ANY_SITE_CODE);
     const [stockPoint, setStockPoint] = useState(initialFilters.stock_point || ANY_STOCK_POINT);
     const [difference, setDifference] = useState<DifferenceFilter>(initialFilters.difference);
 
@@ -240,15 +245,17 @@ export default function StockTransactionReconciliationReport({
         return {
             filter,
             icode_query: icodeQuery.trim(),
+            site_code: siteCode === ANY_SITE_CODE ? '' : siteCode,
             stock_point: stockPoint === ANY_STOCK_POINT ? '' : stockPoint,
             difference,
         };
-    }, [difference, filter, icodeQuery, stockPoint]);
+    }, [difference, filter, icodeQuery, siteCode, stockPoint]);
 
     function buildQueryParams(page = 1) {
         return {
             filter: activeFilters.filter,
             icode_query: activeFilters.icode_query,
+            site_code: activeFilters.site_code,
             stock_point: activeFilters.stock_point,
             difference: activeFilters.difference,
             page,
@@ -262,6 +269,9 @@ export default function StockTransactionReconciliationReport({
         }
         if (activeFilters.icode_query !== '') {
             params.set('icode_query', activeFilters.icode_query);
+        }
+        if (activeFilters.site_code !== '') {
+            params.set('site_code', activeFilters.site_code);
         }
         if (activeFilters.stock_point !== '') {
             params.set('stock_point', activeFilters.stock_point);
@@ -368,6 +378,7 @@ export default function StockTransactionReconciliationReport({
 
     function clearFilters() {
         setIcodeQuery('');
+        setSiteCode(ANY_SITE_CODE);
         setStockPoint(ANY_STOCK_POINT);
         setDifference('all');
         router.get(report.url(session.id), { filter: 'all', page: 1 }, { preserveScroll: false });
@@ -376,6 +387,7 @@ export default function StockTransactionReconciliationReport({
     const isFiltered =
         filter !== 'all' ||
         activeFilters.icode_query !== '' ||
+        activeFilters.site_code !== '' ||
         activeFilters.stock_point !== '' ||
         difference !== 'all';
 
@@ -482,7 +494,7 @@ export default function StockTransactionReconciliationReport({
                 </div>
 
                 <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                         <div className="space-y-1.5">
                             <Label htmlFor="icode-query">Icode search</Label>
                             <Input
@@ -496,6 +508,22 @@ export default function StockTransactionReconciliationReport({
                                     }
                                 }}
                             />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Site code</Label>
+                            <Select value={siteCode} onValueChange={setSiteCode}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Any site code" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ANY_SITE_CODE}>Any site code</SelectItem>
+                                    {siteCodeOptions.map((option) => (
+                                        <SelectItem key={option} value={option}>
+                                            {option}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="space-y-1.5">
                             <Label>Stock point</Label>

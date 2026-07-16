@@ -93,6 +93,7 @@ class StockTransactionReconciliationController extends Controller
 
         $filter = $request->get('filter', 'all');
         $icodeQuery = trim((string) $request->get('icode_query', ''));
+        $siteCode = trim((string) $request->get('site_code', ''));
         $stockPoint = trim((string) $request->get('stock_point', ''));
         $difference = $request->string('difference')->toString();
         $difference = in_array($difference, ['all', 'zero', 'non_zero', 'missing_side'], true) ? $difference : 'all';
@@ -104,6 +105,7 @@ class StockTransactionReconciliationController extends Controller
         [$filterClause, $filterParams] = $this->buildReportConstraints(
             filter: $filter,
             icodeQuery: $icodeQuery,
+            siteCode: $siteCode,
             stockPoint: $stockPoint,
             difference: $difference,
         );
@@ -148,9 +150,11 @@ class StockTransactionReconciliationController extends Controller
             'filter' => $filter,
             'filters' => [
                 'icode_query' => $icodeQuery,
+                'site_code' => $siteCode,
                 'stock_point' => $stockPoint,
                 'difference' => $difference,
             ],
+            'siteCodeOptions' => $this->distinctSiteCodeOptions($sessionId),
             'stockPointOptions' => $this->distinctStockPointOptions($sessionId),
         ]);
     }
@@ -178,6 +182,7 @@ class StockTransactionReconciliationController extends Controller
 
         $filter = $request->get('filter', 'all');
         $icodeQuery = trim((string) $request->get('icode_query', ''));
+        $siteCode = trim((string) $request->get('site_code', ''));
         $stockPoint = trim((string) $request->get('stock_point', ''));
         $difference = $request->string('difference')->toString();
         $difference = in_array($difference, ['all', 'zero', 'non_zero', 'missing_side'], true) ? $difference : 'all';
@@ -186,6 +191,7 @@ class StockTransactionReconciliationController extends Controller
         [$filterClause, $filterParams] = $this->buildReportConstraints(
             filter: $filter,
             icodeQuery: $icodeQuery,
+            siteCode: $siteCode,
             stockPoint: $stockPoint,
             difference: $difference,
         );
@@ -196,7 +202,7 @@ class StockTransactionReconciliationController extends Controller
         );
 
         $segment = $filter === 'all' ? 'all' : $filter;
-        if ($icodeQuery !== '' || $stockPoint !== '' || $difference !== 'all') {
+        if ($icodeQuery !== '' || $siteCode !== '' || $stockPoint !== '' || $difference !== 'all') {
             $segment .= '-filtered';
         }
         $slug = preg_replace('/[^a-z0-9]+/i', '-', $stockReconSession->name);
@@ -313,8 +319,13 @@ class StockTransactionReconciliationController extends Controller
         $perPage = 100;
         $page = max(1, (int) $request->get('page', 1));
         $search = (string) $request->get('search', '');
+        $siteCode = trim((string) $request->get('site_code', ''));
 
         $query = StockReconZwingLog::where('stock_recon_session_id', $stockReconSession->id);
+
+        if ($siteCode !== '') {
+            $query->where('site_code', $siteCode);
+        }
 
         if ($search !== '') {
             $query->where(function ($q) use ($search): void {
@@ -340,6 +351,8 @@ class StockTransactionReconciliationController extends Controller
                 'last_page' => (int) ceil($total / $perPage),
             ],
             'search' => $search,
+            'site_code' => $siteCode,
+            'siteCodeOptions' => $this->distinctZwingLogSiteCodeOptions($stockReconSession->id),
         ]);
     }
 
@@ -351,8 +364,13 @@ class StockTransactionReconciliationController extends Controller
         $perPage = 100;
         $page = max(1, (int) $request->get('page', 1));
         $search = (string) $request->get('search', '');
+        $siteCode = trim((string) $request->get('site_code', ''));
 
         $query = StockReconErpLog::where('stock_recon_session_id', $stockReconSession->id);
+
+        if ($siteCode !== '') {
+            $query->where('site_code', $siteCode);
+        }
 
         if ($search !== '') {
             $query->where(function ($q) use ($search): void {
@@ -378,6 +396,8 @@ class StockTransactionReconciliationController extends Controller
                 'last_page' => (int) ceil($total / $perPage),
             ],
             'search' => $search,
+            'site_code' => $siteCode,
+            'siteCodeOptions' => $this->distinctErpLogSiteCodeOptions($stockReconSession->id),
         ]);
     }
 
@@ -446,6 +466,58 @@ class StockTransactionReconciliationController extends Controller
     /**
      * @return array<int, string>
      */
+    private function distinctSiteCodeOptions(int $sessionId): array
+    {
+        $zwing = DB::table('zwing_stock_reconsile')
+            ->where('session_id', $sessionId)
+            ->whereNotNull('site_code')
+            ->where('site_code', '!=', '')
+            ->distinct()
+            ->pluck('site_code');
+
+        $erp = DB::table('erp_stock_reconsile')
+            ->where('session_id', $sessionId)
+            ->whereNotNull('site_code')
+            ->where('site_code', '!=', '')
+            ->distinct()
+            ->pluck('site_code');
+
+        return $zwing->merge($erp)->unique()->sort()->values()->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function distinctZwingLogSiteCodeOptions(int $sessionId): array
+    {
+        return StockReconZwingLog::query()
+            ->where('stock_recon_session_id', $sessionId)
+            ->whereNotNull('site_code')
+            ->where('site_code', '!=', '')
+            ->distinct()
+            ->orderBy('site_code')
+            ->pluck('site_code')
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function distinctErpLogSiteCodeOptions(int $sessionId): array
+    {
+        return StockReconErpLog::query()
+            ->where('stock_recon_session_id', $sessionId)
+            ->whereNotNull('site_code')
+            ->where('site_code', '!=', '')
+            ->distinct()
+            ->orderBy('site_code')
+            ->pluck('site_code')
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
     private function distinctStockPointOptions(int $sessionId): array
     {
         $zwing = DB::table('zwing_stock_reconsile')
@@ -471,6 +543,7 @@ class StockTransactionReconciliationController extends Controller
     private function buildReportConstraints(
         string $filter,
         string $icodeQuery,
+        string $siteCode,
         string $stockPoint,
         string $difference,
     ): array {
@@ -485,6 +558,11 @@ class StockTransactionReconciliationController extends Controller
         if ($icodeQuery !== '') {
             $clauses[] = 'icode ILIKE ?';
             $params[] = "%{$icodeQuery}%";
+        }
+
+        if ($siteCode !== '') {
+            $clauses[] = 'site_code = ?';
+            $params[] = $siteCode;
         }
 
         if ($stockPoint !== '') {
