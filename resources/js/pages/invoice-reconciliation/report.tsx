@@ -115,12 +115,22 @@ const differenceFilters: { value: DifferenceFilter; label: string }[] = [
 
 const ANY_STATUS = '__any__';
 
-const ZWING_HEAD = 'border-b bg-amber-500/10 px-4 py-2 text-center text-xs font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-300';
-const ERP_HEAD = 'border-b bg-blue-500/10 px-4 py-2 text-center text-xs font-semibold tracking-wide text-blue-800 uppercase dark:text-blue-300';
+const ZWING_HEAD =
+    'border-b bg-amber-500/10 px-4 py-2 text-center text-xs font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-300';
+const ERP_HEAD =
+    'border-b bg-blue-500/10 px-4 py-2 text-center text-xs font-semibold tracking-wide text-blue-800 uppercase dark:text-blue-300';
 const ZWING_CELL = 'bg-amber-500/[0.04]';
 const ERP_CELL = 'bg-blue-500/[0.04]';
 
-function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
+function SummaryCard({
+    label,
+    value,
+    color,
+}: {
+    label: string;
+    value: number;
+    color: string;
+}) {
     return (
         <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
             <p className="text-xs font-medium text-muted-foreground">{label}</p>
@@ -227,9 +237,7 @@ function CompareValue({
     mono?: boolean;
 }) {
     if (value === null || value === '') {
-        return (
-            <span className="text-muted-foreground">—</span>
-        );
+        return <span className="text-muted-foreground">—</span>;
     }
 
     return (
@@ -252,7 +260,7 @@ function ComparisonRow({ row }: { row: ReportRow }) {
     return (
         <tr className="divide-x divide-sidebar-border/50 hover:bg-muted/20">
             <td className="px-3 py-3 align-middle">
-                <Badge variant={variant} className="whitespace-nowrap text-xs">
+                <Badge variant={variant} className="text-xs whitespace-nowrap">
                     {label}
                 </Badge>
             </td>
@@ -273,7 +281,11 @@ function ComparisonRow({ row }: { row: ReportRow }) {
                 className={cn(
                     'px-3 py-3 align-middle',
                     ZWING_CELL,
-                    compareCellClass(row.zwing_invoice_id, row.erp_invoice_id, 'zwing'),
+                    compareCellClass(
+                        row.zwing_invoice_id,
+                        row.erp_invoice_id,
+                        'zwing',
+                    ),
                 )}
             >
                 <CompareValue
@@ -285,7 +297,11 @@ function ComparisonRow({ row }: { row: ReportRow }) {
                 className={cn(
                     'px-3 py-3 text-right align-middle tabular-nums',
                     ZWING_CELL,
-                    compareCellClass(row.zwing_total_amount, row.erp_total_amount, 'zwing'),
+                    compareCellClass(
+                        row.zwing_total_amount,
+                        row.erp_total_amount,
+                        'zwing',
+                    ),
                 )}
             >
                 {formatAmount(row.zwing_total_amount)}
@@ -320,22 +336,36 @@ function ComparisonRow({ row }: { row: ReportRow }) {
                     compareCellClass(row.zwing_ref_id, row.erp_ref_id, 'erp'),
                 )}
             >
-                <CompareValue value={row.erp_ref_id} copyLabel="ERP Mop Ref id" />
+                <CompareValue
+                    value={row.erp_ref_id}
+                    copyLabel="ERP Mop Ref id"
+                />
             </td>
             <td
                 className={cn(
                     'px-3 py-3 align-middle',
                     ERP_CELL,
-                    compareCellClass(row.zwing_invoice_id, row.erp_invoice_id, 'erp'),
+                    compareCellClass(
+                        row.zwing_invoice_id,
+                        row.erp_invoice_id,
+                        'erp',
+                    ),
                 )}
             >
-                <CompareValue value={row.erp_invoice_id} copyLabel="ERP invoice ID" />
+                <CompareValue
+                    value={row.erp_invoice_id}
+                    copyLabel="ERP invoice ID"
+                />
             </td>
             <td
                 className={cn(
                     'px-3 py-3 text-right align-middle tabular-nums',
                     ERP_CELL,
-                    compareCellClass(row.zwing_total_amount, row.erp_total_amount, 'erp'),
+                    compareCellClass(
+                        row.zwing_total_amount,
+                        row.erp_total_amount,
+                        'erp',
+                    ),
                 )}
             >
                 {formatAmount(row.erp_total_amount)}
@@ -362,10 +392,18 @@ export default function InvoiceReconciliationReport({
     filters: initialFilters,
     statusOptions,
 }: Props) {
-    const [invoiceQuery, setInvoiceQuery] = useState(initialFilters.invoice_query);
-    const [zwingStatus, setZwingStatus] = useState(initialFilters.zwing_status || ANY_STATUS);
-    const [erpStatus, setErpStatus] = useState(initialFilters.erp_status || ANY_STATUS);
-    const [difference, setDifference] = useState<DifferenceFilter>(initialFilters.difference);
+    const [invoiceQuery, setInvoiceQuery] = useState(
+        initialFilters.invoice_query,
+    );
+    const [zwingStatus, setZwingStatus] = useState(
+        initialFilters.zwing_status || ANY_STATUS,
+    );
+    const [erpStatus, setErpStatus] = useState(
+        initialFilters.erp_status || ANY_STATUS,
+    );
+    const [difference, setDifference] = useState<DifferenceFilter>(
+        initialFilters.difference,
+    );
 
     const activeFilters = useMemo(() => {
         return {
@@ -420,7 +458,9 @@ export default function InvoiceReconciliationReport({
     }
 
     function applyAdvancedFilters() {
-        router.get(report.url(session.id), buildQueryParams(1), { preserveScroll: false });
+        router.get(report.url(session.id), buildQueryParams(1), {
+            preserveScroll: false,
+        });
     }
 
     function clearFilters() {
@@ -428,7 +468,11 @@ export default function InvoiceReconciliationReport({
         setZwingStatus(ANY_STATUS);
         setErpStatus(ANY_STATUS);
         setDifference('all');
-        router.get(report.url(session.id), { filter: 'all', page: 1 }, { preserveScroll: false });
+        router.get(
+            report.url(session.id),
+            { filter: 'all', page: 1 },
+            { preserveScroll: false },
+        );
     }
 
     const isFiltered =
@@ -439,7 +483,9 @@ export default function InvoiceReconciliationReport({
         difference !== 'all';
 
     function goToPage(page: number) {
-        router.get(report.url(session.id), buildQueryParams(page), { preserveScroll: true });
+        router.get(report.url(session.id), buildQueryParams(page), {
+            preserveScroll: true,
+        });
     }
 
     return (
@@ -450,7 +496,11 @@ export default function InvoiceReconciliationReport({
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <Link href={show.url(session.id)}>
-                            <Button variant="outline" size="icon" className="shrink-0">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="shrink-0"
+                            >
                                 <ArrowLeft className="size-4" />
                             </Button>
                         </Link>
@@ -478,7 +528,11 @@ export default function InvoiceReconciliationReport({
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-                    <SummaryCard label="Total" value={summary.total} color="text-foreground" />
+                    <SummaryCard
+                        label="Total"
+                        value={summary.total}
+                        color="text-foreground"
+                    />
                     <SummaryCard
                         label="In both"
                         value={summary.matched}
@@ -509,12 +563,16 @@ export default function InvoiceReconciliationReport({
                 <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
                         <div className="space-y-1.5">
-                            <Label htmlFor="invoice-query">Invoice / Mop Ref id search</Label>
+                            <Label htmlFor="invoice-query">
+                                Invoice / Mop Ref id search
+                            </Label>
                             <Input
                                 id="invoice-query"
                                 placeholder="e.g. PMM3001252800002 or 22"
                                 value={invoiceQuery}
-                                onChange={(e) => setInvoiceQuery(e.target.value)}
+                                onChange={(e) =>
+                                    setInvoiceQuery(e.target.value)
+                                }
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                         applyAdvancedFilters();
@@ -524,14 +582,22 @@ export default function InvoiceReconciliationReport({
                         </div>
                         <div className="space-y-1.5">
                             <Label>Zwing status</Label>
-                            <Select value={zwingStatus} onValueChange={setZwingStatus}>
+                            <Select
+                                value={zwingStatus}
+                                onValueChange={setZwingStatus}
+                            >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Any Zwing status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={ANY_STATUS}>Any Zwing status</SelectItem>
+                                    <SelectItem value={ANY_STATUS}>
+                                        Any Zwing status
+                                    </SelectItem>
                                     {statusOptions.zwing.map((status) => (
-                                        <SelectItem key={`zwing-${status}`} value={status}>
+                                        <SelectItem
+                                            key={`zwing-${status}`}
+                                            value={status}
+                                        >
                                             {status}
                                         </SelectItem>
                                     ))}
@@ -540,14 +606,22 @@ export default function InvoiceReconciliationReport({
                         </div>
                         <div className="space-y-1.5">
                             <Label>ERP status</Label>
-                            <Select value={erpStatus} onValueChange={setErpStatus}>
+                            <Select
+                                value={erpStatus}
+                                onValueChange={setErpStatus}
+                            >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Any ERP status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={ANY_STATUS}>Any ERP status</SelectItem>
+                                    <SelectItem value={ANY_STATUS}>
+                                        Any ERP status
+                                    </SelectItem>
                                     {statusOptions.erp.map((status) => (
-                                        <SelectItem key={`erp-${status}`} value={status}>
+                                        <SelectItem
+                                            key={`erp-${status}`}
+                                            value={status}
+                                        >
                                             {status}
                                         </SelectItem>
                                     ))}
@@ -558,14 +632,19 @@ export default function InvoiceReconciliationReport({
                             <Label>Amount difference type</Label>
                             <Select
                                 value={difference}
-                                onValueChange={(value: DifferenceFilter) => setDifference(value)}
+                                onValueChange={(value: DifferenceFilter) =>
+                                    setDifference(value)
+                                }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {differenceFilters.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
+                                        <SelectItem
+                                            key={option.value}
+                                            value={option.value}
+                                        >
                                             {option.label}
                                         </SelectItem>
                                     ))}
@@ -573,11 +652,20 @@ export default function InvoiceReconciliationReport({
                             </Select>
                         </div>
                         <div className="flex items-end gap-2">
-                            <Button size="sm" onClick={applyAdvancedFilters} className="flex-1">
+                            <Button
+                                size="sm"
+                                onClick={applyAdvancedFilters}
+                                className="flex-1"
+                            >
                                 <Search className="size-4" />
                                 Apply
                             </Button>
-                            <Button variant="outline" size="sm" onClick={clearFilters} title="Clear filters">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={clearFilters}
+                                title="Clear filters"
+                            >
                                 <X className="size-4" />
                             </Button>
                         </div>
@@ -634,7 +722,7 @@ export default function InvoiceReconciliationReport({
                                 <tr>
                                     <th
                                         rowSpan={2}
-                                        className="border-b border-r bg-muted/50 px-3 py-3 text-left align-bottom font-medium"
+                                        className="border-r border-b bg-muted/50 px-3 py-3 text-left align-bottom font-medium"
                                     >
                                         Result
                                     </th>
@@ -643,7 +731,7 @@ export default function InvoiceReconciliationReport({
                                     </th>
                                     <th
                                         rowSpan={2}
-                                        className="border-b border-x bg-muted/50 px-2 py-3 text-center align-middle text-xs font-medium"
+                                        className="border-x border-b bg-muted/50 px-2 py-3 text-center align-middle text-xs font-medium"
                                     >
                                         Δ Amount
                                     </th>
@@ -652,14 +740,70 @@ export default function InvoiceReconciliationReport({
                                     </th>
                                 </tr>
                                 <tr className="border-b bg-muted/30 text-left text-xs text-muted-foreground">
-                                    <th className={cn('px-3 py-2 font-medium', ZWING_CELL)}>Mop Ref id</th>
-                                    <th className={cn('px-3 py-2 font-medium', ZWING_CELL)}>Invoice</th>
-                                    <th className={cn('px-3 py-2 text-right font-medium', ZWING_CELL)}>Amount</th>
-                                    <th className={cn('px-3 py-2 font-medium', ZWING_CELL)}>Status</th>
-                                    <th className={cn('px-3 py-2 font-medium', ERP_CELL)}>Mop Ref id</th>
-                                    <th className={cn('px-3 py-2 font-medium', ERP_CELL)}>Invoice</th>
-                                    <th className={cn('px-3 py-2 text-right font-medium', ERP_CELL)}>Amount</th>
-                                    <th className={cn('px-3 py-2 font-medium', ERP_CELL)}>Status</th>
+                                    <th
+                                        className={cn(
+                                            'px-3 py-2 font-medium',
+                                            ZWING_CELL,
+                                        )}
+                                    >
+                                        Mop Ref id
+                                    </th>
+                                    <th
+                                        className={cn(
+                                            'px-3 py-2 font-medium',
+                                            ZWING_CELL,
+                                        )}
+                                    >
+                                        Invoice
+                                    </th>
+                                    <th
+                                        className={cn(
+                                            'px-3 py-2 text-right font-medium',
+                                            ZWING_CELL,
+                                        )}
+                                    >
+                                        Amount
+                                    </th>
+                                    <th
+                                        className={cn(
+                                            'px-3 py-2 font-medium',
+                                            ZWING_CELL,
+                                        )}
+                                    >
+                                        Status
+                                    </th>
+                                    <th
+                                        className={cn(
+                                            'px-3 py-2 font-medium',
+                                            ERP_CELL,
+                                        )}
+                                    >
+                                        Mop Ref id
+                                    </th>
+                                    <th
+                                        className={cn(
+                                            'px-3 py-2 font-medium',
+                                            ERP_CELL,
+                                        )}
+                                    >
+                                        Invoice
+                                    </th>
+                                    <th
+                                        className={cn(
+                                            'px-3 py-2 text-right font-medium',
+                                            ERP_CELL,
+                                        )}
+                                    >
+                                        Amount
+                                    </th>
+                                    <th
+                                        className={cn(
+                                            'px-3 py-2 font-medium',
+                                            ERP_CELL,
+                                        )}
+                                    >
+                                        Status
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -669,12 +813,16 @@ export default function InvoiceReconciliationReport({
                                             colSpan={10}
                                             className="px-4 py-10 text-center text-sm text-muted-foreground"
                                         >
-                                            No rows found for the selected filter.
+                                            No rows found for the selected
+                                            filter.
                                         </td>
                                     </tr>
                                 )}
                                 {rows.map((row, i) => (
-                                    <ComparisonRow key={`${row.ref_id}-${row.invoice_id}-${i}`} row={row} />
+                                    <ComparisonRow
+                                        key={`${row.ref_id}-${row.invoice_id}-${i}`}
+                                        row={row}
+                                    />
                                 ))}
                             </tbody>
                         </table>
@@ -683,7 +831,8 @@ export default function InvoiceReconciliationReport({
                     {pagination.last_page > 1 && (
                         <div className="flex items-center justify-between border-t px-4 py-3">
                             <p className="text-sm text-muted-foreground">
-                                Page {pagination.current_page} of {pagination.last_page} ·{' '}
+                                Page {pagination.current_page} of{' '}
+                                {pagination.last_page} ·{' '}
                                 {pagination.total.toLocaleString()} rows
                             </p>
                             <div className="flex gap-2">
@@ -691,15 +840,22 @@ export default function InvoiceReconciliationReport({
                                     variant="outline"
                                     size="sm"
                                     disabled={pagination.current_page <= 1}
-                                    onClick={() => goToPage(pagination.current_page - 1)}
+                                    onClick={() =>
+                                        goToPage(pagination.current_page - 1)
+                                    }
                                 >
                                     Previous
                                 </Button>
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    disabled={pagination.current_page >= pagination.last_page}
-                                    onClick={() => goToPage(pagination.current_page + 1)}
+                                    disabled={
+                                        pagination.current_page >=
+                                        pagination.last_page
+                                    }
+                                    onClick={() =>
+                                        goToPage(pagination.current_page + 1)
+                                    }
                                 >
                                     Next
                                 </Button>

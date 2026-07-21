@@ -16,6 +16,7 @@ class OrganizationFactory extends Factory
             'name' => fake()->company(),
             'ba_code' => strtoupper(fake()->unique()->bothify('BA-####')),
             'vendor_id' => fake()->numberBetween(1000, 9999),
+            'db_name' => 'zw_mn_'.fake()->unique()->numerify('###').'_'.fake()->lexify('??????'),
         ];
     }
 }

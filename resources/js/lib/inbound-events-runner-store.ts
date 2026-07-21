@@ -1,6 +1,11 @@
 import { retry as retryAction } from '@/actions/App/Http/Controllers/InboundEventsRunnerController';
 
-export type RunStatus = 'pending' | 'running' | 'success' | 'failed' | 'skipped';
+export type RunStatus =
+    | 'pending'
+    | 'running'
+    | 'success'
+    | 'failed'
+    | 'skipped';
 
 export type RunItem = {
     logId: string;

@@ -24,6 +24,16 @@ it('shows organization index', function () {
         );
 });
 
+it('shows empty organization index', function () {
+    actingAs($this->user)
+        ->get('/organizations')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('organizations/index')
+            ->has('organizations', 0)
+        );
+});
+
 it('shows create page', function () {
     actingAs($this->user)
         ->get('/organizations/create')

@@ -128,15 +128,26 @@ export default function StockTransactionReconciliationErpLogs({
                         className="flex flex-wrap items-end gap-2"
                     >
                         <div className="space-y-1.5">
-                            <Label htmlFor="site-code-filter" className="sr-only">
+                            <Label
+                                htmlFor="site-code-filter"
+                                className="sr-only"
+                            >
                                 Site code
                             </Label>
-                            <Select value={siteCode} onValueChange={setSiteCode}>
-                                <SelectTrigger id="site-code-filter" className="h-8 w-40">
+                            <Select
+                                value={siteCode}
+                                onValueChange={setSiteCode}
+                            >
+                                <SelectTrigger
+                                    id="site-code-filter"
+                                    className="h-8 w-40"
+                                >
                                     <SelectValue placeholder="Any site code" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={ANY_SITE_CODE}>Any site code</SelectItem>
+                                    <SelectItem value={ANY_SITE_CODE}>
+                                        Any site code
+                                    </SelectItem>
                                     {siteCodeOptions.map((option) => (
                                         <SelectItem key={option} value={option}>
                                             {option}
@@ -210,7 +221,8 @@ export default function StockTransactionReconciliationErpLogs({
                                             colSpan={8}
                                             className="px-4 py-10 text-center text-sm text-muted-foreground"
                                         >
-                                            {search !== '' || initialSiteCode !== ''
+                                            {search !== '' ||
+                                            initialSiteCode !== ''
                                                 ? 'No rows match your filters.'
                                                 : 'No log rows found for this session.'}
                                         </td>

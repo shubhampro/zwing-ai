@@ -45,14 +45,21 @@ type BatchRow = {
     };
 };
 
-const statusVariant: Record<BatchStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const statusVariant: Record<
+    BatchStatus,
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
     pending: 'secondary',
     processing: 'outline',
     completed: 'default',
     failed: 'destructive',
 };
 
-export default function ThirdPartyApiBatchesIndex({ batches }: { batches: BatchRow[] }) {
+export default function ThirdPartyApiBatchesIndex({
+    batches,
+}: {
+    batches: BatchRow[];
+}) {
     const [deletingBatch, setDeletingBatch] = useState<BatchRow | null>(null);
     const { delete: deleteBatch, processing } = useForm();
 
@@ -81,18 +88,30 @@ export default function ThirdPartyApiBatchesIndex({ batches }: { batches: BatchR
                                 <th className="px-3 py-2 font-medium">Batch</th>
                                 <th className="px-3 py-2 font-medium">API</th>
                                 <th className="px-3 py-2 font-medium">Rows</th>
-                                <th className="px-3 py-2 font-medium">Success</th>
-                                <th className="px-3 py-2 font-medium">Failed</th>
-                                <th className="px-3 py-2 font-medium">Status</th>
+                                <th className="px-3 py-2 font-medium">
+                                    Success
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                    Failed
+                                </th>
+                                <th className="px-3 py-2 font-medium">
+                                    Status
+                                </th>
                                 <th className="px-3 py-2 font-medium" />
                             </tr>
                         </thead>
                         <tbody>
                             {batches.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                                    <td
+                                        colSpan={7}
+                                        className="px-3 py-8 text-center text-muted-foreground"
+                                    >
                                         No batches yet.{' '}
-                                        <Link href={create.url()} className="text-foreground underline">
+                                        <Link
+                                            href={create.url()}
+                                            className="text-foreground underline"
+                                        >
                                             Run one
                                         </Link>
                                         .
@@ -104,43 +123,80 @@ export default function ThirdPartyApiBatchesIndex({ batches }: { batches: BatchR
                                     key={batch.id}
                                     className="border-t border-sidebar-border/70 dark:border-sidebar-border"
                                 >
-                                    <td className="px-3 py-2 font-medium">{batch.name}</td>
+                                    <td className="px-3 py-2 font-medium">
+                                        {batch.name}
+                                    </td>
                                     <td className="px-3 py-2 text-muted-foreground">
-                                        {batch.organizationThirdPartyApi?.thirdPartyApi?.name ?? '—'}
-                                        {batch.organizationThirdPartyApi?.thirdPartyApi?.method && (
-                                            <Badge variant="outline" className="ml-2">
-                                                {batch.organizationThirdPartyApi.thirdPartyApi.method}
+                                        {batch.organizationThirdPartyApi
+                                            ?.thirdPartyApi?.name ?? '—'}
+                                        {batch.organizationThirdPartyApi
+                                            ?.thirdPartyApi?.method && (
+                                            <Badge
+                                                variant="outline"
+                                                className="ml-2"
+                                            >
+                                                {
+                                                    batch
+                                                        .organizationThirdPartyApi
+                                                        .thirdPartyApi.method
+                                                }
                                             </Badge>
                                         )}
-                                        {batch.organizationThirdPartyApi?.organization && (
+                                        {batch.organizationThirdPartyApi
+                                            ?.organization && (
                                             <span className="ml-2 text-muted-foreground">
-                                                {batch.organizationThirdPartyApi.organization.name}
+                                                {
+                                                    batch
+                                                        .organizationThirdPartyApi
+                                                        .organization.name
+                                                }
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-3 py-2 tabular-nums">{batch.row_count ?? '—'}</td>
-                                    <td className="px-3 py-2 tabular-nums text-green-600">{batch.success_count}</td>
-                                    <td className="px-3 py-2 tabular-nums text-destructive">{batch.failed_count}</td>
+                                    <td className="px-3 py-2 tabular-nums">
+                                        {batch.row_count ?? '—'}
+                                    </td>
+                                    <td className="px-3 py-2 text-green-600 tabular-nums">
+                                        {batch.success_count}
+                                    </td>
+                                    <td className="px-3 py-2 text-destructive tabular-nums">
+                                        {batch.failed_count}
+                                    </td>
                                     <td className="px-3 py-2">
-                                        <Badge variant={statusVariant[batch.status]}>{batch.status}</Badge>
+                                        <Badge
+                                            variant={
+                                                statusVariant[batch.status]
+                                            }
+                                        >
+                                            {batch.status}
+                                        </Badge>
                                     </td>
                                     <td className="px-3 py-2 text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="sm">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                >
                                                     <MoreHorizontal className="size-4" />
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuItem asChild>
-                                                    <Link href={show.url(batch.id)}>
+                                                    <Link
+                                                        href={show.url(
+                                                            batch.id,
+                                                        )}
+                                                    >
                                                         <Eye className="size-4" />
                                                         View batch
                                                     </Link>
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     className="text-destructive focus:text-destructive"
-                                                    onSelect={() => setDeletingBatch(batch)}
+                                                    onSelect={() =>
+                                                        setDeletingBatch(batch)
+                                                    }
                                                 >
                                                     <Trash2 className="size-4" />
                                                     Delete
@@ -155,16 +211,27 @@ export default function ThirdPartyApiBatchesIndex({ batches }: { batches: BatchR
                 </div>
             </div>
 
-            <Dialog open={deletingBatch !== null} onOpenChange={(open) => !open && setDeletingBatch(null)}>
+            <Dialog
+                open={deletingBatch !== null}
+                onOpenChange={(open) => !open && setDeletingBatch(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Delete batch?</DialogTitle>
                         <DialogDescription>
-                            Remove <span className="font-medium text-foreground">{deletingBatch?.name}</span>.
+                            Remove{' '}
+                            <span className="font-medium text-foreground">
+                                {deletingBatch?.name}
+                            </span>
+                            .
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeletingBatch(null)} disabled={processing}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeletingBatch(null)}
+                            disabled={processing}
+                        >
                             Cancel
                         </Button>
                         <Button

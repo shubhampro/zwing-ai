@@ -9,7 +9,12 @@ import { Label } from '@/components/ui/label';
 import { dashboard } from '@/routes';
 import { create, index } from '@/routes/invoice-reconciliation';
 
-const REQUIRED_COLUMNS = ['invoice_id', 'ref_id', 'total_amount', 'status'] as const;
+const REQUIRED_COLUMNS = [
+    'invoice_id',
+    'ref_id',
+    'total_amount',
+    'status',
+] as const;
 
 const MAX_FILE_SIZE_MB = 512;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -32,9 +37,13 @@ function RequiredColumnsHint() {
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
                 Multiple Mop Ref ids on one invoice → separate with{' '}
-                <code className="rounded bg-muted px-1 font-mono text-xs">-</code>{' '}
+                <code className="rounded bg-muted px-1 font-mono text-xs">
+                    -
+                </code>{' '}
                 (e.g.{' '}
-                <code className="rounded bg-muted px-1 font-mono text-xs">22-21</code>
+                <code className="rounded bg-muted px-1 font-mono text-xs">
+                    22-21
+                </code>
                 )
             </p>
             <pre className="mt-1 overflow-x-auto rounded bg-background px-2 py-1.5 font-mono text-xs">

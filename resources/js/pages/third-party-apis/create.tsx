@@ -44,7 +44,11 @@ export default function ThirdPartyApisCreate({ httpMethods }: Props) {
         is_active: true,
     });
 
-    function updateParam(index: number, field: keyof ApiParam, value: string | boolean) {
+    function updateParam(
+        index: number,
+        field: keyof ApiParam,
+        value: string | boolean,
+    ) {
         const params = [...data.params];
         params[index] = { ...params[index], [field]: value };
         setData('params', params);
@@ -63,14 +67,19 @@ export default function ThirdPartyApisCreate({ httpMethods }: Props) {
                 <div>
                     <h1 className="text-xl font-semibold">Add API template</h1>
                     <p className="text-sm text-muted-foreground">
-                        Shared endpoint definition. Set org base URL + token under Organizations → View.
+                        Shared endpoint definition. Set org base URL + token
+                        under Organizations → View.
                     </p>
                 </div>
 
                 <form onSubmit={submit} className="flex flex-col gap-4">
                     <div className="space-y-1.5">
                         <Label htmlFor="name">Name</Label>
-                        <Input id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} />
+                        <Input
+                            id="name"
+                            value={data.name}
+                            onChange={(e) => setData('name', e.target.value)}
+                        />
                         <InputError message={errors.name} />
                     </div>
 
@@ -80,7 +89,9 @@ export default function ThirdPartyApisCreate({ httpMethods }: Props) {
                             <Input
                                 id="path"
                                 value={data.path}
-                                onChange={(e) => setData('path', e.target.value)}
+                                onChange={(e) =>
+                                    setData('path', e.target.value)
+                                }
                                 placeholder="/api/v1/example"
                                 className="font-mono text-sm"
                             />
@@ -88,11 +99,20 @@ export default function ThirdPartyApisCreate({ httpMethods }: Props) {
                         </div>
                         <div className="space-y-1.5 sm:w-36">
                             <Label>Method</Label>
-                            <Select value={data.method} onValueChange={(value) => setData('method', value)}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                            <Select
+                                value={data.method}
+                                onValueChange={(value) =>
+                                    setData('method', value)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
                                     {methodEntries.map(([value, label]) => (
-                                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                                        <SelectItem key={value} value={value}>
+                                            {label}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -102,16 +122,59 @@ export default function ThirdPartyApisCreate({ httpMethods }: Props) {
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <Label>Request params</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={() => setData('params', [...data.params, defaultParam()])}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    setData('params', [
+                                        ...data.params,
+                                        defaultParam(),
+                                    ])
+                                }
+                            >
                                 <Plus className="size-4" /> Add param
                             </Button>
                         </div>
                         {data.params.map((param, index) => (
-                            <div key={index} className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
-                                <Input placeholder="Param key" value={param.key} onChange={(e) => updateParam(index, 'key', e.target.value)} />
-                                <Input placeholder="CSV column" value={param.csv_column} onChange={(e) => updateParam(index, 'csv_column', e.target.value)} />
+                            <div
+                                key={index}
+                                className="grid gap-2 rounded-md border p-3 sm:grid-cols-2"
+                            >
+                                <Input
+                                    placeholder="Param key"
+                                    value={param.key}
+                                    onChange={(e) =>
+                                        updateParam(
+                                            index,
+                                            'key',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                                <Input
+                                    placeholder="CSV column"
+                                    value={param.csv_column}
+                                    onChange={(e) =>
+                                        updateParam(
+                                            index,
+                                            'csv_column',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
                                 <label className="flex items-center gap-2 text-xs sm:col-span-2">
-                                    <input type="checkbox" checked={param.required} onChange={(e) => updateParam(index, 'required', e.target.checked)} />
+                                    <input
+                                        type="checkbox"
+                                        checked={param.required}
+                                        onChange={(e) =>
+                                            updateParam(
+                                                index,
+                                                'required',
+                                                e.target.checked,
+                                            )
+                                        }
+                                    />
                                     Required in CSV
                                 </label>
                             </div>
@@ -119,12 +182,22 @@ export default function ThirdPartyApisCreate({ httpMethods }: Props) {
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="auth_header_name">Auth header name</Label>
-                        <Input id="auth_header_name" value={data.auth_header_name} onChange={(e) => setData('auth_header_name', e.target.value)} />
+                        <Label htmlFor="auth_header_name">
+                            Auth header name
+                        </Label>
+                        <Input
+                            id="auth_header_name"
+                            value={data.auth_header_name}
+                            onChange={(e) =>
+                                setData('auth_header_name', e.target.value)
+                            }
+                        />
                         <InputError message={errors.auth_header_name} />
                     </div>
 
-                    <Button type="submit" disabled={processing}>Save template</Button>
+                    <Button type="submit" disabled={processing}>
+                        Save template
+                    </Button>
                 </form>
             </div>
         </>

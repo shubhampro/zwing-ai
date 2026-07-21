@@ -32,7 +32,11 @@ function statusBadge(status: RunStatus) {
                 </Badge>
             );
         case 'success':
-            return <Badge className="bg-green-600 hover:bg-green-600">Success</Badge>;
+            return (
+                <Badge className="bg-green-600 hover:bg-green-600">
+                    Success
+                </Badge>
+            );
         case 'failed':
             return <Badge variant="destructive">Failed</Badge>;
         case 'skipped':
@@ -84,14 +88,16 @@ export default function InboundEventsRunnerIndex({
             item.status === 'failed' ||
             item.status === 'skipped',
     ).length;
-    const successCount = items.filter((item) => item.status === 'success').length;
+    const successCount = items.filter(
+        (item) => item.status === 'success',
+    ).length;
     const failedCount = items.filter((item) => item.status === 'failed').length;
     const progress =
-        items.length > 0 ? Math.round((completedCount / items.length) * 100) : 0;
+        items.length > 0
+            ? Math.round((completedCount / items.length) * 100)
+            : 0;
     const isComplete =
-        items.length > 0 &&
-        !running &&
-        completedCount === items.length;
+        items.length > 0 && !running && completedCount === items.length;
 
     function handleClear() {
         clearRunner();
@@ -267,7 +273,7 @@ export default function InboundEventsRunnerIndex({
                                     <span className="text-xs text-muted-foreground">
                                         Success
                                     </span>
-                                    <p className="text-2xl font-semibold tabular-nums text-green-600">
+                                    <p className="text-2xl font-semibold text-green-600 tabular-nums">
                                         {successCount}
                                     </p>
                                 </div>
@@ -275,7 +281,7 @@ export default function InboundEventsRunnerIndex({
                                     <span className="text-xs text-muted-foreground">
                                         Failed
                                     </span>
-                                    <p className="text-2xl font-semibold tabular-nums text-destructive">
+                                    <p className="text-2xl font-semibold text-destructive tabular-nums">
                                         {failedCount}
                                     </p>
                                 </div>
@@ -336,7 +342,7 @@ export default function InboundEventsRunnerIndex({
                                                 key={`${item.logId}-${index}`}
                                                 className="border-t border-sidebar-border/70 dark:border-sidebar-border"
                                             >
-                                                <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                                                <td className="px-3 py-2 text-muted-foreground tabular-nums">
                                                     {index + 1}
                                                 </td>
                                                 <td className="px-3 py-2 font-mono text-xs">
@@ -350,11 +356,11 @@ export default function InboundEventsRunnerIndex({
                                                 </td>
                                                 <td className="max-w-md px-3 py-2">
                                                     {item.response ? (
-                                                        <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/60 p-2 font-mono text-xs">
+                                                        <pre className="max-h-24 overflow-auto rounded bg-muted/60 p-2 font-mono text-xs break-all whitespace-pre-wrap">
                                                             {item.response}
                                                         </pre>
                                                     ) : item.error ? (
-                                                        <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-all rounded bg-destructive/10 p-2 font-mono text-xs text-destructive">
+                                                        <pre className="max-h-24 overflow-auto rounded bg-destructive/10 p-2 font-mono text-xs break-all whitespace-pre-wrap text-destructive">
                                                             {item.error}
                                                         </pre>
                                                     ) : (

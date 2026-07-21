@@ -95,13 +95,7 @@ async function copyIdsAsSqlInClause(
     }
 }
 
-function IdChip({
-    id,
-    tone,
-}: {
-    id: string;
-    tone: 'amber' | 'blue';
-}) {
+function IdChip({ id, tone }: { id: string; tone: 'amber' | 'blue' }) {
     const styles = toneStyles(tone);
 
     return (
@@ -307,7 +301,7 @@ function EntityTableRow({
                 </td>
                 <td
                     className={cn(
-                        'px-3 py-3 text-right tabular-nums text-green-700 dark:text-green-400',
+                        'px-3 py-3 text-right text-green-700 tabular-nums dark:text-green-400',
                         SYNC_CELL,
                     )}
                 >
@@ -389,8 +383,7 @@ function StatusBadge({
     needToSync: string[];
     eventMiss: string[];
 }) {
-    const issues =
-        failCnt + pending + needToSync.length + eventMiss.length;
+    const issues = failCnt + pending + needToSync.length + eventMiss.length;
 
     if (issues === 0) {
         return (
@@ -403,7 +396,9 @@ function StatusBadge({
     }
 
     return (
-        <Badge className="bg-amber-600 hover:bg-amber-600">Pending / miss</Badge>
+        <Badge className="bg-amber-600 hover:bg-amber-600">
+            Pending / miss
+        </Badge>
     );
 }
 
@@ -613,7 +608,7 @@ export default function OutboundSyncIndex({
                                 <p className="text-sm font-medium">
                                     Overall sync progress
                                 </p>
-                                <span className="text-sm tabular-nums text-muted-foreground">
+                                <span className="text-sm text-muted-foreground tabular-nums">
                                     {syncPercent.toFixed(2)}%
                                 </span>
                             </div>
@@ -660,13 +655,13 @@ export default function OutboundSyncIndex({
                                         <tr>
                                             <th
                                                 rowSpan={2}
-                                                className="border-b border-r bg-muted/50 px-3 py-3 text-left align-bottom font-medium"
+                                                className="border-r border-b bg-muted/50 px-3 py-3 text-left align-bottom font-medium"
                                             >
                                                 Entity
                                             </th>
                                             <th
                                                 rowSpan={2}
-                                                className="border-b border-r bg-muted/50 px-3 py-3 text-left align-bottom font-medium"
+                                                className="border-r border-b bg-muted/50 px-3 py-3 text-left align-bottom font-medium"
                                             >
                                                 Status
                                             </th>

@@ -67,20 +67,32 @@ export default function ThirdPartyApisIndex({ apis }: { apis: ApiRow[] }) {
                         <thead className="bg-muted/50 text-muted-foreground">
                             <tr>
                                 <th className="px-3 py-2 font-medium">Name</th>
-                                <th className="px-3 py-2 font-medium">Method</th>
+                                <th className="px-3 py-2 font-medium">
+                                    Method
+                                </th>
                                 <th className="px-3 py-2 font-medium">Path</th>
-                                <th className="px-3 py-2 font-medium">Params</th>
+                                <th className="px-3 py-2 font-medium">
+                                    Params
+                                </th>
                                 <th className="px-3 py-2 font-medium">Orgs</th>
-                                <th className="px-3 py-2 font-medium">Status</th>
+                                <th className="px-3 py-2 font-medium">
+                                    Status
+                                </th>
                                 <th className="px-3 py-2 font-medium" />
                             </tr>
                         </thead>
                         <tbody>
                             {apis.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                                    <td
+                                        colSpan={7}
+                                        className="px-3 py-8 text-center text-muted-foreground"
+                                    >
                                         No API templates.{' '}
-                                        <Link href={create.url()} className="text-foreground underline">
+                                        <Link
+                                            href={create.url()}
+                                            className="text-foreground underline"
+                                        >
                                             Add one
                                         </Link>
                                         .
@@ -92,35 +104,60 @@ export default function ThirdPartyApisIndex({ apis }: { apis: ApiRow[] }) {
                                     key={api.id}
                                     className="border-t border-sidebar-border/70 dark:border-sidebar-border"
                                 >
-                                    <td className="px-3 py-2 font-medium">{api.name}</td>
-                                    <td className="px-3 py-2">
-                                        <Badge variant="outline">{api.method}</Badge>
+                                    <td className="px-3 py-2 font-medium">
+                                        {api.name}
                                     </td>
-                                    <td className="max-w-xs truncate px-3 py-2 font-mono text-xs">{api.path}</td>
-                                    <td className="px-3 py-2 tabular-nums">{api.param_count}</td>
-                                    <td className="px-3 py-2 tabular-nums">{api.connection_count}</td>
                                     <td className="px-3 py-2">
-                                        <Badge variant={api.is_active ? 'default' : 'secondary'}>
-                                            {api.is_active ? 'Active' : 'Inactive'}
+                                        <Badge variant="outline">
+                                            {api.method}
+                                        </Badge>
+                                    </td>
+                                    <td className="max-w-xs truncate px-3 py-2 font-mono text-xs">
+                                        {api.path}
+                                    </td>
+                                    <td className="px-3 py-2 tabular-nums">
+                                        {api.param_count}
+                                    </td>
+                                    <td className="px-3 py-2 tabular-nums">
+                                        {api.connection_count}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <Badge
+                                            variant={
+                                                api.is_active
+                                                    ? 'default'
+                                                    : 'secondary'
+                                            }
+                                        >
+                                            {api.is_active
+                                                ? 'Active'
+                                                : 'Inactive'}
                                         </Badge>
                                     </td>
                                     <td className="px-3 py-2 text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="sm">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                >
                                                     <MoreHorizontal className="size-4" />
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuItem asChild>
-                                                    <Link href={edit.url(api.id)}>
+                                                    <Link
+                                                        href={edit.url(api.id)}
+                                                    >
                                                         <Pencil className="size-4" />
                                                         Edit template & orgs
                                                     </Link>
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     className="text-destructive focus:text-destructive"
-                                                    onSelect={() => setDeletingApi(api)}
+                                                    onSelect={() =>
+                                                        setDeletingApi(api)
+                                                    }
                                                 >
                                                     <Trash2 className="size-4" />
                                                     Delete
@@ -135,17 +172,27 @@ export default function ThirdPartyApisIndex({ apis }: { apis: ApiRow[] }) {
                 </div>
             </div>
 
-            <Dialog open={deletingApi !== null} onOpenChange={(open) => !open && setDeletingApi(null)}>
+            <Dialog
+                open={deletingApi !== null}
+                onOpenChange={(open) => !open && setDeletingApi(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Delete API template?</DialogTitle>
                         <DialogDescription>
-                            Remove <span className="font-medium text-foreground">{deletingApi?.name}</span> and all
-                            org connections.
+                            Remove{' '}
+                            <span className="font-medium text-foreground">
+                                {deletingApi?.name}
+                            </span>{' '}
+                            and all org connections.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeletingApi(null)} disabled={processing}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeletingApi(null)}
+                            disabled={processing}
+                        >
                             Cancel
                         </Button>
                         <Button

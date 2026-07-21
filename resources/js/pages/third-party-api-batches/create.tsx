@@ -32,15 +32,25 @@ type Props = {
     connections: ConnectionOption[];
 };
 
-function firstConnectionId(organizationId: string, connections: ConnectionOption[]): string {
-    const match = connections.find((c) => String(c.organization_id) === organizationId);
+function firstConnectionId(
+    organizationId: string,
+    connections: ConnectionOption[],
+): string {
+    const match = connections.find(
+        (c) => String(c.organization_id) === organizationId,
+    );
 
     return match ? String(match.id) : '';
 }
 
-export default function ThirdPartyApiBatchesCreate({ organizations, connections }: Props) {
+export default function ThirdPartyApiBatchesCreate({
+    organizations,
+    connections,
+}: Props) {
     const fileRef = useRef<HTMLInputElement>(null);
-    const defaultOrganizationId = organizations[0] ? String(organizations[0].id) : '';
+    const defaultOrganizationId = organizations[0]
+        ? String(organizations[0].id)
+        : '';
 
     const { data, setData, post, processing, errors } = useForm<{
         name: string;
@@ -51,29 +61,50 @@ export default function ThirdPartyApiBatchesCreate({ organizations, connections 
     }>({
         name: '',
         organization_id: defaultOrganizationId,
-        organization_third_party_api_id: firstConnectionId(defaultOrganizationId, connections),
+        organization_third_party_api_id: firstConnectionId(
+            defaultOrganizationId,
+            connections,
+        ),
         defaults: {},
         csv: null,
     });
 
     const orgConnections = useMemo(
-        () => connections.filter((c) => String(c.organization_id) === data.organization_id),
+        () =>
+            connections.filter(
+                (c) => String(c.organization_id) === data.organization_id,
+            ),
         [connections, data.organization_id],
     );
 
     const selected = useMemo(
-        () => connections.find((c) => String(c.id) === data.organization_third_party_api_id),
+        () =>
+            connections.find(
+                (c) => String(c.id) === data.organization_third_party_api_id,
+            ),
         [connections, data.organization_third_party_api_id],
     );
 
-    const optionalParams = useMemo(() => selected?.params.filter((p) => !p.required) ?? [], [selected]);
-    const requiredColumns = useMemo(() => selected?.params.filter((p) => p.required).map((p) => p.csv_column) ?? [], [selected]);
+    const optionalParams = useMemo(
+        () => selected?.params.filter((p) => !p.required) ?? [],
+        [selected],
+    );
+    const requiredColumns = useMemo(
+        () =>
+            selected?.params
+                .filter((p) => p.required)
+                .map((p) => p.csv_column) ?? [],
+        [selected],
+    );
 
     function selectOrganization(organizationId: string) {
         setData({
             ...data,
             organization_id: organizationId,
-            organization_third_party_api_id: firstConnectionId(organizationId, connections),
+            organization_third_party_api_id: firstConnectionId(
+                organizationId,
+                connections,
+            ),
             defaults: {},
         });
     }
@@ -99,19 +130,28 @@ export default function ThirdPartyApiBatchesCreate({ organizations, connections 
             <div className="flex max-w-xl flex-col gap-6 p-4 md:p-6">
                 <div>
                     <h1 className="text-xl font-semibold">New API batch</h1>
-                    <p className="text-sm text-muted-foreground">Select organization, then API connection with base URL + token.</p>
+                    <p className="text-sm text-muted-foreground">
+                        Select organization, then API connection with base URL +
+                        token.
+                    </p>
                 </div>
 
                 {requiredColumns.length > 0 && (
                     <div className="rounded-md bg-muted/60 px-3 py-2 text-xs">
-                        Required CSV: <code className="font-mono">{requiredColumns.join(', ')}</code>
+                        Required CSV:{' '}
+                        <code className="font-mono">
+                            {requiredColumns.join(', ')}
+                        </code>
                     </div>
                 )}
 
                 <form onSubmit={submit} className="flex flex-col gap-4">
                     <div className="space-y-1.5">
                         <Label>Batch name</Label>
-                        <Input value={data.name} onChange={(e) => setData('name', e.target.value)} />
+                        <Input
+                            value={data.name}
+                            onChange={(e) => setData('name', e.target.value)}
+                        />
                         <InputError message={errors.name} />
                     </div>
 
@@ -127,7 +167,10 @@ export default function ThirdPartyApiBatchesCreate({ organizations, connections 
                             </SelectTrigger>
                             <SelectContent>
                                 {organizations.map((org) => (
-                                    <SelectItem key={org.id} value={String(org.id)}>
+                                    <SelectItem
+                                        key={org.id}
+                                        value={String(org.id)}
+                                    >
                                         {org.name} (BA {org.ba_code})
                                     </SelectItem>
                                 ))}
@@ -147,37 +190,63 @@ export default function ThirdPartyApiBatchesCreate({ organizations, connections 
                             </SelectTrigger>
                             <SelectContent>
                                 {orgConnections.map((connection) => (
-                                    <SelectItem key={connection.id} value={String(connection.id)}>
-                                        {connection.api_name} ({connection.method})
+                                    <SelectItem
+                                        key={connection.id}
+                                        value={String(connection.id)}
+                                    >
+                                        {connection.api_name} (
+                                        {connection.method})
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
-                        <InputError message={errors.organization_third_party_api_id} />
-                        {data.organization_id && orgConnections.length === 0 && (
-                            <p className="text-xs text-muted-foreground">
-                                No active API connections for this org.{' '}
-                                <Link href={organizationShow.url(Number(data.organization_id))} className="underline">
-                                    Configure under Organizations → View
-                                </Link>
-                                .
-                            </p>
-                        )}
+                        <InputError
+                            message={errors.organization_third_party_api_id}
+                        />
+                        {data.organization_id &&
+                            orgConnections.length === 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    No active API connections for this org.{' '}
+                                    <Link
+                                        href={organizationShow.url(
+                                            Number(data.organization_id),
+                                        )}
+                                        className="underline"
+                                    >
+                                        Configure under Organizations → View
+                                    </Link>
+                                    .
+                                </p>
+                            )}
                     </div>
 
                     {optionalParams.map((param) => (
                         <div key={param.key} className="space-y-1">
-                            <Label className="text-xs">Default: {param.key}</Label>
+                            <Label className="text-xs">
+                                Default: {param.key}
+                            </Label>
                             <Input
                                 value={data.defaults[param.key] ?? ''}
-                                onChange={(e) => setData('defaults', { ...data.defaults, [param.key]: e.target.value })}
+                                onChange={(e) =>
+                                    setData('defaults', {
+                                        ...data.defaults,
+                                        [param.key]: e.target.value,
+                                    })
+                                }
                             />
                         </div>
                     ))}
 
                     <div className="space-y-1.5">
                         <Label>CSV file</Label>
-                        <Input type="file" accept=".csv" ref={fileRef} onChange={(e) => setData('csv', e.target.files?.[0] ?? null)} />
+                        <Input
+                            type="file"
+                            accept=".csv"
+                            ref={fileRef}
+                            onChange={(e) =>
+                                setData('csv', e.target.files?.[0] ?? null)
+                            }
+                        />
                         <InputError message={errors.csv} />
                     </div>
 

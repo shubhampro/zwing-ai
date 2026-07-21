@@ -8,7 +8,13 @@ import { Label } from '@/components/ui/label';
 import { dashboard } from '@/routes';
 import { create, index } from '@/routes/expense-cash-reconciliation';
 
-const REQUIRED_COLUMNS = ['site_id', 'doc_no', 'date', 'amount', 'status'] as const;
+const REQUIRED_COLUMNS = [
+    'site_id',
+    'doc_no',
+    'date',
+    'amount',
+    'status',
+] as const;
 
 const SAMPLE_ROWS = [
     ['101', 'EXP-001', '2026-05-01', '1500.00', 'APPROVED'],

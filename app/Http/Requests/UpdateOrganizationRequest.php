@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Organization;
+use App\Support\Permissions;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -10,7 +11,7 @@ class UpdateOrganizationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can(Permissions::OrganizationsUpdate) ?? false;
     }
 
     /**

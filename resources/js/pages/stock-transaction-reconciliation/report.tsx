@@ -1,5 +1,13 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Copy, Download, FileText, Loader2, Search, X } from 'lucide-react';
+import {
+    ArrowLeft,
+    Copy,
+    Download,
+    FileText,
+    Loader2,
+    Search,
+    X,
+} from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -237,9 +245,15 @@ export default function StockTransactionReconciliationReport({
     stockPointOptions,
 }: Props) {
     const [icodeQuery, setIcodeQuery] = useState(initialFilters.icode_query);
-    const [siteCode, setSiteCode] = useState(initialFilters.site_code || ANY_SITE_CODE);
-    const [stockPoint, setStockPoint] = useState(initialFilters.stock_point || ANY_STOCK_POINT);
-    const [difference, setDifference] = useState<DifferenceFilter>(initialFilters.difference);
+    const [siteCode, setSiteCode] = useState(
+        initialFilters.site_code || ANY_SITE_CODE,
+    );
+    const [stockPoint, setStockPoint] = useState(
+        initialFilters.stock_point || ANY_STOCK_POINT,
+    );
+    const [difference, setDifference] = useState<DifferenceFilter>(
+        initialFilters.difference,
+    );
 
     const activeFilters = useMemo(() => {
         return {
@@ -373,7 +387,9 @@ export default function StockTransactionReconciliationReport({
     }
 
     function applyAdvancedFilters() {
-        router.get(report.url(session.id), buildQueryParams(1), { preserveScroll: false });
+        router.get(report.url(session.id), buildQueryParams(1), {
+            preserveScroll: false,
+        });
     }
 
     function clearFilters() {
@@ -381,7 +397,11 @@ export default function StockTransactionReconciliationReport({
         setSiteCode(ANY_SITE_CODE);
         setStockPoint(ANY_STOCK_POINT);
         setDifference('all');
-        router.get(report.url(session.id), { filter: 'all', page: 1 }, { preserveScroll: false });
+        router.get(
+            report.url(session.id),
+            { filter: 'all', page: 1 },
+            { preserveScroll: false },
+        );
     }
 
     const isFiltered =
@@ -392,7 +412,9 @@ export default function StockTransactionReconciliationReport({
         difference !== 'all';
 
     function goToPage(page: number) {
-        router.get(report.url(session.id), buildQueryParams(page), { preserveScroll: true });
+        router.get(report.url(session.id), buildQueryParams(page), {
+            preserveScroll: true,
+        });
     }
 
     const selectedDiff =
@@ -511,12 +533,17 @@ export default function StockTransactionReconciliationReport({
                         </div>
                         <div className="space-y-1.5">
                             <Label>Site code</Label>
-                            <Select value={siteCode} onValueChange={setSiteCode}>
+                            <Select
+                                value={siteCode}
+                                onValueChange={setSiteCode}
+                            >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Any site code" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={ANY_SITE_CODE}>Any site code</SelectItem>
+                                    <SelectItem value={ANY_SITE_CODE}>
+                                        Any site code
+                                    </SelectItem>
                                     {siteCodeOptions.map((option) => (
                                         <SelectItem key={option} value={option}>
                                             {option}
@@ -527,12 +554,17 @@ export default function StockTransactionReconciliationReport({
                         </div>
                         <div className="space-y-1.5">
                             <Label>Stock point</Label>
-                            <Select value={stockPoint} onValueChange={setStockPoint}>
+                            <Select
+                                value={stockPoint}
+                                onValueChange={setStockPoint}
+                            >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Any stock point" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={ANY_STOCK_POINT}>Any stock point</SelectItem>
+                                    <SelectItem value={ANY_STOCK_POINT}>
+                                        Any stock point
+                                    </SelectItem>
                                     {stockPointOptions.map((option) => (
                                         <SelectItem key={option} value={option}>
                                             {option}
@@ -545,14 +577,19 @@ export default function StockTransactionReconciliationReport({
                             <Label>Qty difference type</Label>
                             <Select
                                 value={difference}
-                                onValueChange={(value: DifferenceFilter) => setDifference(value)}
+                                onValueChange={(value: DifferenceFilter) =>
+                                    setDifference(value)
+                                }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {differenceFilters.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
+                                        <SelectItem
+                                            key={option.value}
+                                            value={option.value}
+                                        >
                                             {option.label}
                                         </SelectItem>
                                     ))}
@@ -560,11 +597,20 @@ export default function StockTransactionReconciliationReport({
                             </Select>
                         </div>
                         <div className="flex items-end gap-2">
-                            <Button size="sm" onClick={applyAdvancedFilters} className="flex-1">
+                            <Button
+                                size="sm"
+                                onClick={applyAdvancedFilters}
+                                className="flex-1"
+                            >
                                 <Search className="size-4" />
                                 Apply
                             </Button>
-                            <Button variant="outline" size="sm" onClick={clearFilters} title="Clear filters">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={clearFilters}
+                                title="Clear filters"
+                            >
                                 <X className="size-4" />
                             </Button>
                         </div>
@@ -663,8 +709,13 @@ export default function StockTransactionReconciliationReport({
                                             </td>
                                             <td className="px-4 py-2.5">
                                                 <div className="flex items-center gap-1">
-                                                    <span className="font-mono text-xs">{row.icode}</span>
-                                                    <CopyIconButton text={row.icode} label="Icode" />
+                                                    <span className="font-mono text-xs">
+                                                        {row.icode}
+                                                    </span>
+                                                    <CopyIconButton
+                                                        text={row.icode}
+                                                        label="Icode"
+                                                    />
                                                 </div>
                                             </td>
                                             <td className="px-4 py-2.5 text-muted-foreground">

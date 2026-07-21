@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -16,6 +17,20 @@ class UserFactory extends Factory
      * The current password being used by the factory.
      */
     protected static ?string $password;
+
+    /**
+     * Configure the model factory.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            if ($user->roles()->exists()) {
+                return;
+            }
+
+            $user->assignRole(Role::Admin);
+        });
+    }
 
     /**
      * Define the model's default state.
@@ -56,5 +71,26 @@ class UserFactory extends Factory
             'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
             'two_factor_confirmed_at' => now(),
         ]);
+    }
+
+    public function admin(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $user->syncRoles([Role::Admin]);
+        });
+    }
+
+    public function operator(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $user->syncRoles([Role::Operator]);
+        });
+    }
+
+    public function viewer(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $user->syncRoles([Role::Viewer]);
+        });
     }
 }

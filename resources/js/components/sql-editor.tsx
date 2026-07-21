@@ -60,87 +60,91 @@ function getSelectedText(
     return model.getValueInRange(selection);
 }
 
-const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function SqlEditor(
-    { value, onChange, schemaTables = [], height = '420px' },
-    ref,
-) {
-    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-    const completionDisposable = useRef<{ dispose: () => void } | null>(null);
-
-    useImperativeHandle(
+const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
+    function SqlEditor(
+        { value, onChange, schemaTables = [], height = '420px' },
         ref,
-        () => ({
-            getCopyText: () => {
-                const editorInstance = editorRef.current;
+    ) {
+        const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+        const completionDisposable = useRef<{ dispose: () => void } | null>(
+            null,
+        );
 
-                if (editorInstance === null) {
-                    return value;
+        useImperativeHandle(
+            ref,
+            () => ({
+                getCopyText: () => {
+                    const editorInstance = editorRef.current;
+
+                    if (editorInstance === null) {
+                        return value;
+                    }
+
+                    const selectedText = getSelectedText(editorInstance);
+
+                    if (selectedText !== null) {
+                        return selectedText;
+                    }
+
+                    return editorInstance.getValue();
+                },
+                hasSelection: () => {
+                    const editorInstance = editorRef.current;
+
+                    if (editorInstance === null) {
+                        return false;
+                    }
+
+                    return getSelectedText(editorInstance) !== null;
+                },
+            }),
+            [value],
+        );
+
+        const handleMount = useCallback(
+            (editorInstance: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+                editorRef.current = editorInstance;
+                completionDisposable.current?.dispose();
+
+                if (schemaTables.length > 0) {
+                    completionDisposable.current = registerSqlCompletions(
+                        monaco,
+                        schemaTables,
+                    );
                 }
-
-                const selectedText = getSelectedText(editorInstance);
-
-                if (selectedText !== null) {
-                    return selectedText;
-                }
-
-                return editorInstance.getValue();
             },
-            hasSelection: () => {
-                const editorInstance = editorRef.current;
+            [schemaTables],
+        );
 
-                if (editorInstance === null) {
-                    return false;
-                }
-
-                return getSelectedText(editorInstance) !== null;
-            },
-        }),
-        [value],
-    );
-
-    const handleMount = useCallback(
-        (editorInstance: editor.IStandaloneCodeEditor, monaco: Monaco) => {
-            editorRef.current = editorInstance;
-            completionDisposable.current?.dispose();
-
-            if (schemaTables.length > 0) {
-                completionDisposable.current = registerSqlCompletions(
-                    monaco,
-                    schemaTables,
-                );
-            }
-        },
-        [schemaTables],
-    );
-
-    return (
-        <div className="overflow-hidden rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
-            <Editor
-                height={height}
-                defaultLanguage="sql"
-                theme="vs-dark"
-                value={value}
-                onChange={(nextValue) => onChange(nextValue ?? '')}
-                onMount={handleMount}
-                options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    lineNumbers: 'on',
-                    scrollBeyondLastLine: false,
-                    wordWrap: 'on',
-                    tabSize: 2,
-                    automaticLayout: true,
-                    suggestOnTriggerCharacters: true,
-                    quickSuggestions: {
-                        other: true,
-                        comments: false,
-                        strings: false,
-                    },
-                    padding: { top: 12, bottom: 12 },
-                }}
-            />
-        </div>
-    );
-});
+        return (
+            <div className="overflow-hidden rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
+                <Editor
+                    height={height}
+                    defaultLanguage="sql"
+                    theme="vs-dark"
+                    value={value}
+                    onChange={(nextValue) => onChange(nextValue ?? '')}
+                    onMount={handleMount}
+                    options={{
+                        minimap: { enabled: false },
+                        fontSize: 14,
+                        lineNumbers: 'on',
+                        scrollBeyondLastLine: false,
+                        wordWrap: 'on',
+                        tabSize: 2,
+                        automaticLayout: true,
+                        suggestOnTriggerCharacters: true,
+                        quickSuggestions: {
+                            other: true,
+                            comments: false,
+                            strings: false,
+                        },
+                        padding: { top: 12, bottom: 12 },
+                    }}
+                />
+            </div>
+        );
+    },
+);
 
 export default SqlEditor;

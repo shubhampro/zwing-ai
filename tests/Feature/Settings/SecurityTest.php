@@ -21,6 +21,7 @@ test('security page is displayed', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/security')
             ->where('canManageTwoFactor', true)
+            ->where('twoFactorRequired', true)
             ->where('twoFactorEnabled', false),
         );
 });
@@ -72,6 +73,7 @@ test('security page renders without two factor when feature is disabled', functi
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/security')
             ->where('canManageTwoFactor', false)
+            ->where('twoFactorRequired', false)
             ->missing('twoFactorEnabled')
             ->missing('requiresConfirmation'),
         );
@@ -85,15 +87,15 @@ test('password can be updated', function () {
         ->from(route('security.edit'))
         ->put(route('user-password.update'), [
             'current_password' => 'password',
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
+            'password' => strongPassword(),
+            'password_confirmation' => strongPassword(),
         ]);
 
     $response
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('security.edit'));
 
-    expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
+    expect(Hash::check(strongPassword(), $user->refresh()->password))->toBeTrue();
 });
 
 test('correct password must be provided to update password', function () {
@@ -104,8 +106,8 @@ test('correct password must be provided to update password', function () {
         ->from(route('security.edit'))
         ->put(route('user-password.update'), [
             'current_password' => 'wrong-password',
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
+            'password' => strongPassword(),
+            'password_confirmation' => strongPassword(),
         ]);
 
     $response

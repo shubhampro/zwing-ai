@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Middleware\EnsureTwoFactorIsEnabled;
+use App\Http\Middleware\PreventTwoFactorDisable;
 use App\Services\SshTunnelManager;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,6 +24,11 @@ pest()->extend(TestCase::class)
 
 pest()->beforeEach(function () {
     SshTunnelManager::$fake = true;
+    $this->seed(RolePermissionSeeder::class);
+    $this->withoutMiddleware([
+        EnsureTwoFactorIsEnabled::class,
+        PreventTwoFactorDisable::class,
+    ]);
 })->in('Feature');
 
 /*
@@ -49,7 +57,10 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Password that satisfies app Password::defaults rules (non-production).
+ */
+function strongPassword(): string
 {
-    // ..
+    return 'Str0ng!Pass#99';
 }

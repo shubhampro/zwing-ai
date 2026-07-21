@@ -1,4 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
+import InviteRegistrationController from '@/actions/App/Http/Controllers/Auth/InviteRegistrationController';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
@@ -8,14 +9,20 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import { login } from '@/routes';
-import { store } from '@/routes/register';
 
-export default function Register() {
+type Props = {
+    token: string;
+    email: string | null;
+};
+
+export default function InviteRegister({ token, email }: Props) {
+    const emailLocked = Boolean(email);
+
     return (
         <>
-            <Head title="Register" />
+            <Head title="Accept invite" />
             <Form
-                {...store.form()}
+                {...InviteRegistrationController.store.form(token)}
                 resetOnSuccess={['password', 'password_confirmation']}
                 disableWhileProcessing
                 className="flex flex-col gap-6"
@@ -48,6 +55,8 @@ export default function Register() {
                                     tabIndex={2}
                                     autoComplete="email"
                                     name="email"
+                                    defaultValue={email ?? undefined}
+                                    readOnly={emailLocked}
                                     placeholder="email@example.com"
                                     className="h-10"
                                 />
@@ -91,7 +100,7 @@ export default function Register() {
                                 className="h-10 w-full"
                                 tabIndex={5}
                                 disabled={processing}
-                                data-test="register-user-button"
+                                data-test="invite-register-button"
                             >
                                 {processing && <Spinner />}
                                 Create account
@@ -113,7 +122,8 @@ export default function Register() {
     );
 }
 
-Register.layout = {
-    title: 'Create an account',
-    description: 'Enter your details below to create your account',
+InviteRegister.layout = {
+    title: 'Accept your invite',
+    description:
+        'Create your account with this single-use invite link. Use a strong password (12+ chars, upper, lower, number, symbol).',
 };

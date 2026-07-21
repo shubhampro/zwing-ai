@@ -66,7 +66,8 @@ type SqlQueriesIndexProps = {
 
 type View = 'list' | 'editor';
 
-const EMPTY_SQL = '-- Write your SQL query here\nSELECT * FROM grn\nWHERE id = 1;';
+const EMPTY_SQL =
+    '-- Write your SQL query here\nSELECT * FROM grn\nWHERE id = 1;';
 
 function formatUpdatedAt(value: string | null): string {
     if (!value) {
@@ -394,7 +395,9 @@ export default function SqlQueriesIndex({
                                                 }
                                             >
                                                 <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
+                                                    <DropdownMenuTrigger
+                                                        asChild
+                                                    >
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
@@ -486,7 +489,9 @@ export default function SqlQueriesIndex({
                                     size="sm"
                                     variant="outline"
                                     disabled={importing}
-                                    onClick={() => fileInputRef.current?.click()}
+                                    onClick={() =>
+                                        fileInputRef.current?.click()
+                                    }
                                 >
                                     {importing ? (
                                         <Loader2 className="size-4 animate-spin" />
@@ -612,7 +617,7 @@ export default function SqlQueriesIndex({
                                         }
                                         placeholder="Notes for teammates…"
                                         rows={2}
-                                        className="border-input placeholder:text-muted-foreground flex min-h-[60px] w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"
+                                        className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
                                     />
                                     {errors.description && (
                                         <p className="text-sm text-destructive">
@@ -626,8 +631,8 @@ export default function SqlQueriesIndex({
                                 <div className="flex items-center justify-between">
                                     <Label>SQL</Label>
                                     <p className="text-xs text-muted-foreground">
-                                        Select text to copy one query · Ctrl+Space
-                                        for suggestions
+                                        Select text to copy one query ·
+                                        Ctrl+Space for suggestions
                                     </p>
                                 </div>
                                 <SqlEditor

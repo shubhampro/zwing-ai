@@ -1,10 +1,17 @@
 import { Head, Link, router, useForm, usePoll } from '@inertiajs/react';
 import { ArrowLeft, ChevronDown, Download, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
-import { retryFailed, retryItem } from '@/actions/App/Http/Controllers/ThirdPartyApiBatchController';
+import {
+    retryFailed,
+    retryItem,
+} from '@/actions/App/Http/Controllers/ThirdPartyApiBatchController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { dashboard } from '@/routes';
 import { index as apisIndex } from '@/routes/third-party-apis';
@@ -45,7 +52,10 @@ const filters = [
     { value: 'skipped', label: 'Skipped' },
 ] as const;
 
-const statusVariant: Record<ItemStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const statusVariant: Record<
+    ItemStatus,
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
     success: 'default',
     failed: 'destructive',
     pending: 'outline',
@@ -68,14 +78,30 @@ type Props = {
         organizationThirdPartyApi?: {
             id: number;
             base_url: string;
-            thirdPartyApi?: { id: number; name: string; path: string; method: string };
+            thirdPartyApi?: {
+                id: number;
+                name: string;
+                path: string;
+                method: string;
+            };
             organization?: { id: number; name: string; ba_code: string };
         };
     };
     paramKeys: string[];
-    summary: { total: number; success: number; failed: number; skipped: number; pending: number };
+    summary: {
+        total: number;
+        success: number;
+        failed: number;
+        skipped: number;
+        pending: number;
+    };
     rows: Row[];
-    pagination: { total: number; per_page: number; current_page: number; last_page: number };
+    pagination: {
+        total: number;
+        per_page: number;
+        current_page: number;
+        last_page: number;
+    };
     filter: string;
     search: string;
 };
@@ -94,8 +120,13 @@ export default function ThirdPartyApiBatchesShow({
     const { post: retryOne, processing: retryingOne } = useForm();
     const { post: retryAll, processing: retryingAll } = useForm();
 
-    const isRunning = batch.status === 'pending' || batch.status === 'processing';
-    usePoll(2000, { only: ['batch', 'summary', 'rows', 'pagination'] }, { autoStart: isRunning });
+    const isRunning =
+        batch.status === 'pending' || batch.status === 'processing';
+    usePoll(
+        2000,
+        { only: ['batch', 'summary', 'rows', 'pagination'] },
+        { autoStart: isRunning },
+    );
 
     function apply(filterValue: string, page = 1) {
         router.get(
@@ -120,11 +151,24 @@ export default function ThirdPartyApiBatchesShow({
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-xl font-semibold">{batch.name}</h1>
+                            <h1 className="text-xl font-semibold">
+                                {batch.name}
+                            </h1>
                             <p className="text-sm text-muted-foreground">
-                                {batch.organizationThirdPartyApi?.thirdPartyApi?.name} ({batch.organizationThirdPartyApi?.thirdPartyApi?.method})
-                                {' · '}
-                                {batch.organizationThirdPartyApi?.organization?.name}
+                                {
+                                    batch.organizationThirdPartyApi
+                                        ?.thirdPartyApi?.name
+                                }{' '}
+                                (
+                                {
+                                    batch.organizationThirdPartyApi
+                                        ?.thirdPartyApi?.method
+                                }
+                                ){' · '}
+                                {
+                                    batch.organizationThirdPartyApi
+                                        ?.organization?.name
+                                }
                             </p>
                         </div>
                     </div>
@@ -134,7 +178,9 @@ export default function ThirdPartyApiBatchesShow({
                                 variant="outline"
                                 size="sm"
                                 disabled={retryingAll}
-                                onClick={() => retryAll(retryFailed.url(batch.id))}
+                                onClick={() =>
+                                    retryAll(retryFailed.url(batch.id))
+                                }
                             >
                                 <RotateCcw className="size-4" />
                                 Retry failed ({summary.failed})
@@ -152,7 +198,9 @@ export default function ThirdPartyApiBatchesShow({
                 <div className="flex flex-wrap items-center gap-2">
                     <Badge>{batch.status}</Badge>
                     {batch.file_name && (
-                        <span className="font-mono text-xs text-muted-foreground">{batch.file_name}</span>
+                        <span className="font-mono text-xs text-muted-foreground">
+                            {batch.file_name}
+                        </span>
                     )}
                 </div>
 
@@ -168,8 +216,12 @@ export default function ThirdPartyApiBatchesShow({
                             key={label}
                             className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border"
                         >
-                            <dt className="text-xs text-muted-foreground">{label}</dt>
-                            <dd className="text-2xl font-semibold tabular-nums">{value}</dd>
+                            <dt className="text-xs text-muted-foreground">
+                                {label}
+                            </dt>
+                            <dd className="text-2xl font-semibold tabular-nums">
+                                {value}
+                            </dd>
                         </div>
                     ))}
                 </dl>
@@ -183,8 +235,11 @@ export default function ThirdPartyApiBatchesShow({
                             onClick={() => apply(f.value)}
                         >
                             {f.label}
-                            <span className="ml-1 tabular-nums text-muted-foreground">
-                                ({summary[f.value as keyof typeof summary] ?? summary.total})
+                            <span className="ml-1 text-muted-foreground tabular-nums">
+                                (
+                                {summary[f.value as keyof typeof summary] ??
+                                    summary.total}
+                                )
                             </span>
                         </Button>
                     ))}
@@ -213,29 +268,47 @@ export default function ThirdPartyApiBatchesShow({
                         <Collapsible
                             key={row.id}
                             open={openRowId === row.id}
-                            onOpenChange={(open) => setOpenRowId(open ? row.id : null)}
+                            onOpenChange={(open) =>
+                                setOpenRowId(open ? row.id : null)
+                            }
                             className="rounded-lg border border-sidebar-border/70 dark:border-sidebar-border"
                         >
                             <div className="flex flex-wrap items-center gap-3 p-3">
                                 <CollapsibleTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="gap-2 px-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="gap-2 px-2"
+                                    >
                                         <ChevronDown className="size-4 transition-transform [[data-state=open]_&]:rotate-180" />
                                         <span className="font-mono text-xs">
-                                            {paramKeys.map((key) => row.payload?.[key]).filter(Boolean).join(' · ') || `Row #${row.id}`}
+                                            {paramKeys
+                                                .map(
+                                                    (key) => row.payload?.[key],
+                                                )
+                                                .filter(Boolean)
+                                                .join(' · ') ||
+                                                `Row #${row.id}`}
                                         </span>
                                     </Button>
                                 </CollapsibleTrigger>
-                                <Badge variant={statusVariant[row.status]}>{row.status}</Badge>
-                                <span className="text-xs tabular-nums text-muted-foreground">
+                                <Badge variant={statusVariant[row.status]}>
+                                    {row.status}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground tabular-nums">
                                     HTTP {row.http_status ?? '—'}
                                 </span>
                                 {row.error_message && (
-                                    <span className="truncate text-xs text-destructive">{row.error_message}</span>
+                                    <span className="truncate text-xs text-destructive">
+                                        {row.error_message}
+                                    </span>
                                 )}
                                 <span className="ml-auto text-xs text-muted-foreground">
-                                    {row.attempts.length} attempt{row.attempts.length === 1 ? '' : 's'}
+                                    {row.attempts.length} attempt
+                                    {row.attempts.length === 1 ? '' : 's'}
                                 </span>
-                                {(row.status === 'failed' || row.status === 'success') && (
+                                {(row.status === 'failed' ||
+                                    row.status === 'success') && (
                                     <Button
                                         variant="outline"
                                         size="sm"
@@ -243,8 +316,10 @@ export default function ThirdPartyApiBatchesShow({
                                         onClick={() =>
                                             retryOne(
                                                 retryItem.url({
-                                                    thirdPartyApiBatch: batch.id,
-                                                    thirdPartyApiBatchItem: row.id,
+                                                    thirdPartyApiBatch:
+                                                        batch.id,
+                                                    thirdPartyApiBatchItem:
+                                                        row.id,
                                                 }),
                                                 { preserveScroll: true },
                                             )
@@ -259,35 +334,65 @@ export default function ThirdPartyApiBatchesShow({
                             <CollapsibleContent className="border-t px-3 pb-3">
                                 <div className="flex flex-col gap-4 pt-3">
                                     {row.attempts.length === 0 && (
-                                        <p className="text-sm text-muted-foreground">No attempt history yet.</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            No attempt history yet.
+                                        </p>
                                     )}
                                     {row.attempts.map((attempt) => (
-                                        <div key={attempt.id} className="rounded-md bg-muted/40 p-3 text-xs">
+                                        <div
+                                            key={attempt.id}
+                                            className="rounded-md bg-muted/40 p-3 text-xs"
+                                        >
                                             <div className="mb-2 flex flex-wrap items-center gap-2">
-                                                <Badge variant="outline">Attempt {attempt.attempt_number}</Badge>
+                                                <Badge variant="outline">
+                                                    Attempt{' '}
+                                                    {attempt.attempt_number}
+                                                </Badge>
                                                 <span className="font-mono">
-                                                    {attempt.request_method} {attempt.request_url}
+                                                    {attempt.request_method}{' '}
+                                                    {attempt.request_url}
                                                 </span>
-                                                <span className="tabular-nums">HTTP {attempt.http_status ?? '—'}</span>
+                                                <span className="tabular-nums">
+                                                    HTTP{' '}
+                                                    {attempt.http_status ?? '—'}
+                                                </span>
                                                 {attempt.created_at && (
-                                                    <span className="text-muted-foreground">{attempt.created_at}</span>
+                                                    <span className="text-muted-foreground">
+                                                        {attempt.created_at}
+                                                    </span>
                                                 )}
                                             </div>
                                             <div className="grid gap-3 lg:grid-cols-2">
                                                 <div>
-                                                    <p className="mb-1 font-medium">Request headers</p>
+                                                    <p className="mb-1 font-medium">
+                                                        Request headers
+                                                    </p>
                                                     <pre className="overflow-x-auto rounded border bg-background p-2 font-mono">
-                                                        {JSON.stringify(attempt.request_headers, null, 2)}
+                                                        {JSON.stringify(
+                                                            attempt.request_headers,
+                                                            null,
+                                                            2,
+                                                        )}
                                                     </pre>
-                                                    <p className="mb-1 mt-2 font-medium">Request body</p>
+                                                    <p className="mt-2 mb-1 font-medium">
+                                                        Request body
+                                                    </p>
                                                     <pre className="overflow-x-auto rounded border bg-background p-2 font-mono">
-                                                        {JSON.stringify(attempt.request_body, null, 2)}
+                                                        {JSON.stringify(
+                                                            attempt.request_body,
+                                                            null,
+                                                            2,
+                                                        )}
                                                     </pre>
                                                 </div>
                                                 <div>
-                                                    <p className="mb-1 font-medium">Response</p>
+                                                    <p className="mb-1 font-medium">
+                                                        Response
+                                                    </p>
                                                     <pre className="max-h-48 overflow-auto rounded border bg-background p-2 font-mono whitespace-pre-wrap">
-                                                        {attempt.response_body ?? attempt.error_message ?? '—'}
+                                                        {attempt.response_body ??
+                                                            attempt.error_message ??
+                                                            '—'}
                                                     </pre>
                                                 </div>
                                             </div>
@@ -302,22 +407,30 @@ export default function ThirdPartyApiBatchesShow({
                 {pagination.last_page > 1 && (
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                         <span>
-                            Page {pagination.current_page} of {pagination.last_page}
+                            Page {pagination.current_page} of{' '}
+                            {pagination.last_page}
                         </span>
                         <div className="flex gap-2">
                             <Button
                                 variant="outline"
                                 size="sm"
                                 disabled={pagination.current_page <= 1}
-                                onClick={() => apply(filter, pagination.current_page - 1)}
+                                onClick={() =>
+                                    apply(filter, pagination.current_page - 1)
+                                }
                             >
                                 Previous
                             </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
-                                disabled={pagination.current_page >= pagination.last_page}
-                                onClick={() => apply(filter, pagination.current_page + 1)}
+                                disabled={
+                                    pagination.current_page >=
+                                    pagination.last_page
+                                }
+                                onClick={() =>
+                                    apply(filter, pagination.current_page + 1)
+                                }
                             >
                                 Next
                             </Button>

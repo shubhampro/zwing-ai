@@ -32,6 +32,7 @@ class SecurityController extends Controller implements HasMiddleware
     {
         $props = [
             'canManageTwoFactor' => Features::canManageTwoFactorAuthentication(),
+            'twoFactorRequired' => Features::canManageTwoFactorAuthentication(),
         ];
 
         if (Features::canManageTwoFactorAuthentication()) {
@@ -39,6 +40,17 @@ class SecurityController extends Controller implements HasMiddleware
 
             $props['twoFactorEnabled'] = $request->user()->hasEnabledTwoFactorAuthentication();
             $props['requiresConfirmation'] = Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm');
+
+            if (! $props['twoFactorEnabled']) {
+                $props['twoFactorSetupMessage'] = __('Two-factor authentication is required. Enable 2FA below before you can use the rest of the app.');
+
+                if ($request->session()->pull('two_factor_enforcement_notice')) {
+                    Inertia::flash('toast', [
+                        'type' => 'warning',
+                        'message' => $props['twoFactorSetupMessage'],
+                    ]);
+                }
+            }
         }
 
         return Inertia::render('settings/security', $props);
