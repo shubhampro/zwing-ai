@@ -16,7 +16,8 @@
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.14",
         "league/csv": "^9.28",
-        "mongodb/laravel-mongodb": "^5.7"
+        "mongodb/laravel-mongodb": "^5.7",
+        "mongodb/mongodb": "^2.1.2 <2.2"
     },
     "require-dev": {
         "fakerphp/faker": "^1.24",
@@ -77,8 +78,10 @@
             "@php artisan package:discover --ansi"
         ],
         "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
-            "@php -r \"$out=[]; exec(PHP_BINARY.' artisan list --raw 2>/dev/null', $out); if (!preg_grep('/^boost:update\\b/', $out)) { exit(0);} passthru(PHP_BINARY.' artisan boost:update --ansi', $code); exit($code);\""
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+        ],
+        "boost:update": [
+            "@php artisan boost:update --ansi"
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
