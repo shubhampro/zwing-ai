@@ -10,6 +10,7 @@ use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationThirdPartyApiController;
 use App\Http\Controllers\OutboundSyncController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\ServerHealthController;
 use App\Http\Controllers\SqlQueryController;
 use App\Http\Controllers\StockTransactionReconciliationController;
 use App\Http\Controllers\ThirdPartyApiBatchController;
@@ -38,6 +39,9 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::middleware('permission:'.Permissions::UsersManage)->group(function () {
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::put('users/{user}/role', [UserController::class, 'updateRole'])->name('users.role.update');
+        Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+        Route::delete('users/{user}/force', [UserController::class, 'forceDestroy'])->name('users.force-destroy');
+        Route::post('users/{user}/restore', [UserController::class, 'restore'])->name('users.restore');
     });
 
     Route::middleware('permission:'.Permissions::InvitesManage)->group(function () {
@@ -253,6 +257,13 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::post('outbound-sync/fetch', [OutboundSyncController::class, 'fetch'])
         ->middleware('permission:'.Permissions::OutboundSyncManage)
         ->name('outbound-sync.fetch');
+
+    Route::middleware('permission:'.Permissions::ServerHealthView)->group(function () {
+        Route::get('server-health', [ServerHealthController::class, 'index'])->name('server-health.index');
+    });
+    Route::post('server-health/refresh', [ServerHealthController::class, 'refresh'])
+        ->middleware('permission:'.Permissions::ServerHealthManage)
+        ->name('server-health.refresh');
 
     Route::get('sql-queries', [SqlQueryController::class, 'index'])
         ->middleware('permission:'.Permissions::SqlQueriesView)

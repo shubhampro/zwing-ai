@@ -56,6 +56,10 @@ final class Permissions
 
     public const SqlQueriesManage = 'sql-queries.manage';
 
+    public const ServerHealthView = 'server-health.view';
+
+    public const ServerHealthManage = 'server-health.manage';
+
     /**
      * @return list<string>
      */
@@ -88,6 +92,8 @@ final class Permissions
             self::OutboundSyncManage,
             self::SqlQueriesView,
             self::SqlQueriesManage,
+            self::ServerHealthView,
+            self::ServerHealthManage,
         ];
     }
 
@@ -98,12 +104,15 @@ final class Permissions
     {
         return array_values(array_filter(
             self::all(),
-            fn (string $permission): bool => str_ends_with($permission, '.view'),
+            fn (string $permission): bool => str_ends_with($permission, '.view')
+                && ! in_array($permission, [
+                    self::ServerHealthView,
+                ], true),
         ));
     }
 
     /**
-     * Operator: everything except user/invite/role admin.
+     * Operator: everything except user/invite/role admin and server health.
      *
      * @return list<string>
      */
@@ -115,6 +124,8 @@ final class Permissions
                 self::UsersManage,
                 self::InvitesManage,
                 self::RolesManage,
+                self::ServerHealthView,
+                self::ServerHealthManage,
             ], true),
         ));
     }

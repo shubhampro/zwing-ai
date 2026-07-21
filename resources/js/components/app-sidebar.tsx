@@ -1,5 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
+    Activity,
     ArrowLeftRight,
     Building2,
     ClipboardCheck,
@@ -39,6 +40,7 @@ import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconcilia
 import { index as organizationsIndex } from '@/routes/organizations';
 import { index as outboundSyncIndex } from '@/routes/outbound-sync';
 import { index as rolesIndex } from '@/routes/roles';
+import { index as serverHealthIndex } from '@/routes/server-health';
 import { index as sqlQueriesIndex } from '@/routes/sql-queries';
 import { index as stockTransactionReconciliationIndex } from '@/routes/stock-transaction-reconciliation';
 import { index as thirdPartyApiBatchesIndex } from '@/routes/third-party-api-batches';
@@ -146,6 +148,12 @@ const mainNavItems: NavItem[] = [
                 href: outboundSyncIndex.url(),
                 icon: CloudUpload,
                 permission: 'outbound-sync.view',
+            },
+            {
+                title: 'DB Health',
+                href: serverHealthIndex.url(),
+                icon: Activity,
+                permission: 'server-health.view',
             },
         ],
     },
