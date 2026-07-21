@@ -2,6 +2,7 @@
 
 use App\Enums\Role;
 use App\Models\Invite;
+use Spatie\Permission\PermissionRegistrar;
 
 test('artisan command creates a single-use invite link', function () {
     $this->artisan('user:invite')
@@ -45,5 +46,14 @@ test('artisan command can lock invite to an email and expiry', function () {
 test('artisan command rejects invalid email', function () {
     $this->artisan('user:invite', ['email' => 'not-an-email'])
         ->expectsOutputToContain('Invalid email address')
+        ->assertFailed();
+});
+
+test('artisan command tells you to seed when no roles exist', function () {
+    Spatie\Permission\Models\Role::query()->delete();
+    app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+    $this->artisan('user:invite', ['--role' => 'admin'])
+        ->expectsOutputToContain('No roles found in the database. Run: php artisan db:seed --class=RolePermissionSeeder')
         ->assertFailed();
 });

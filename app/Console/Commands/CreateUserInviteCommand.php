@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\Role;
 use App\Models\Invite;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -34,11 +33,16 @@ class CreateUserInviteCommand extends Command
             return self::FAILURE;
         }
 
-        $roleExists = SpatieRole::query()->where('name', $roleName)->exists();
+        $availableRoles = SpatieRole::query()->orderBy('name')->pluck('name');
 
-        if (! $roleExists) {
-            $available = SpatieRole::query()->orderBy('name')->pluck('name')->implode(', ');
-            $this->error('The --role option must be one of: '.($available !== '' ? $available : implode(', ', Role::values())).'.');
+        if ($availableRoles->isEmpty()) {
+            $this->error('No roles found in the database. Run: php artisan db:seed --class=RolePermissionSeeder');
+
+            return self::FAILURE;
+        }
+
+        if (! $availableRoles->contains($roleName)) {
+            $this->error('The --role option must be one of: '.$availableRoles->implode(', ').'.');
 
             return self::FAILURE;
         }
