@@ -11,6 +11,9 @@ import {
     Mail,
     PlayCircle,
     Plug,
+    RefreshCw,
+    Scale,
+    Shield,
     Users,
     Wallet,
 } from 'lucide-react';
@@ -51,22 +54,28 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
-        title: 'Users',
-        href: usersIndex.url(),
-        icon: Users,
-        permission: 'users.manage',
-    },
-    {
-        title: 'Invites',
-        href: invitesIndex.url(),
-        icon: Mail,
-        permission: 'invites.manage',
-    },
-    {
-        title: 'Roles',
-        href: rolesIndex.url(),
-        icon: KeyRound,
-        permission: 'roles.manage',
+        title: 'Access',
+        icon: Shield,
+        items: [
+            {
+                title: 'Users',
+                href: usersIndex.url(),
+                icon: Users,
+                permission: 'users.manage',
+            },
+            {
+                title: 'Invites',
+                href: invitesIndex.url(),
+                icon: Mail,
+                permission: 'invites.manage',
+            },
+            {
+                title: 'Roles',
+                href: rolesIndex.url(),
+                icon: KeyRound,
+                permission: 'roles.manage',
+            },
+        ],
     },
     {
         title: 'Organizations',
@@ -75,52 +84,70 @@ const mainNavItems: NavItem[] = [
         permission: 'organizations.view',
     },
     {
-        title: 'Third party APIs',
-        href: thirdPartyApisIndex.url(),
+        title: 'Integrations',
         icon: Plug,
-        permission: 'third-party-apis.view',
+        items: [
+            {
+                title: 'Third party APIs',
+                href: thirdPartyApisIndex.url(),
+                icon: Plug,
+                permission: 'third-party-apis.view',
+            },
+            {
+                title: 'API batches',
+                href: thirdPartyApiBatchesIndex.url(),
+                icon: FileText,
+                permission: 'api-batches.view',
+            },
+        ],
     },
     {
-        title: 'API batches',
-        href: thirdPartyApiBatchesIndex.url(),
-        icon: FileText,
-        permission: 'api-batches.view',
+        title: 'Reconciliation',
+        icon: Scale,
+        items: [
+            {
+                title: 'Stock reconciliation',
+                href: stockTransactionReconciliationIndex.url(),
+                icon: ArrowLeftRight,
+                permission: 'stock-recon.view',
+            },
+            {
+                title: 'Transaction Checker',
+                href: transactionCheckerIndex.url(),
+                icon: ClipboardCheck,
+                permission: 'transaction-checker.view',
+            },
+            {
+                title: 'Invoice reconciliation',
+                href: invoiceReconciliationIndex.url(),
+                icon: FileText,
+                permission: 'invoice-recon.view',
+            },
+            {
+                title: 'Expense & cash',
+                href: expenseCashReconciliationIndex.url(),
+                icon: Wallet,
+                permission: 'expense-cash-recon.view',
+            },
+        ],
     },
     {
-        title: 'Stock reconciliation',
-        href: stockTransactionReconciliationIndex.url(),
-        icon: ArrowLeftRight,
-        permission: 'stock-recon.view',
-    },
-    {
-        title: 'Transaction Checker',
-        href: transactionCheckerIndex.url(),
-        icon: ClipboardCheck,
-        permission: 'transaction-checker.view',
-    },
-    {
-        title: 'Invoice reconciliation',
-        href: invoiceReconciliationIndex.url(),
-        icon: FileText,
-        permission: 'invoice-recon.view',
-    },
-    {
-        title: 'Expense & cash reconciliation',
-        href: expenseCashReconciliationIndex.url(),
-        icon: Wallet,
-        permission: 'expense-cash-recon.view',
-    },
-    {
-        title: 'Inbound Events Runner',
-        href: inboundEventsRunnerIndex.url(),
-        icon: PlayCircle,
-        permission: 'inbound-events.view',
-    },
-    {
-        title: 'Outbound Sync',
-        href: outboundSyncIndex.url(),
-        icon: CloudUpload,
-        permission: 'outbound-sync.view',
+        title: 'Operations',
+        icon: RefreshCw,
+        items: [
+            {
+                title: 'Inbound Events Runner',
+                href: inboundEventsRunnerIndex.url(),
+                icon: PlayCircle,
+                permission: 'inbound-events.view',
+            },
+            {
+                title: 'Outbound Sync',
+                href: outboundSyncIndex.url(),
+                icon: CloudUpload,
+                permission: 'outbound-sync.view',
+            },
+        ],
     },
     {
         title: 'SQL Queries',
@@ -132,15 +159,31 @@ const mainNavItems: NavItem[] = [
 
 const footerNavItems: NavItem[] = [];
 
+function filterNavItems(items: NavItem[], permissions: string[]): NavItem[] {
+    return items.flatMap((item) => {
+        if (item.items?.length) {
+            const children = filterNavItems(item.items, permissions);
+
+            if (children.length === 0) {
+                return [];
+            }
+
+            return [{ ...item, items: children }];
+        }
+
+        if (item.permission && !permissions.includes(item.permission)) {
+            return [];
+        }
+
+        return [item];
+    });
+}
+
 export function AppSidebar() {
     const permissions = usePage().props.auth?.permissions ?? [];
 
     const visibleNavItems = useMemo(
-        () =>
-            mainNavItems.filter(
-                (item) =>
-                    !item.permission || permissions.includes(item.permission),
-            ),
+        () => filterNavItems(mainNavItems, permissions),
         [permissions],
     );
 
