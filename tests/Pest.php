@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\SshTunnelManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,6 +18,10 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
+
+pest()->beforeEach(function () {
+    SshTunnelManager::$fake = true;
+})->in('Feature');
 
 /*
 |--------------------------------------------------------------------------

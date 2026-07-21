@@ -101,8 +101,8 @@ return [
 
         'mysql_ssh' => [
             'driver' => 'mysql',
-            'host' => env('MYSQL_REMOTE_HOST', '127.0.0.1'),
-            'port' => env('MYSQL_REMOTE_PORT', 3306),
+            'host' => '127.0.0.1',
+            'port' => env('MYSQL_SSH_LOCAL_PORT', env('MYSQL_REMOTE_PORT', 3307)),
             'database' => env('MYSQL_REMOTE_DATABASE', ''),
             'username' => env('MYSQL_REMOTE_USERNAME', ''),
             'password' => env('MYSQL_REMOTE_PASSWORD', ''),
@@ -113,6 +113,20 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => [],
+            /*
+            | Lazy SSH tunnel: opened on demand via SshTunnelManager.
+            | MYSQL_SSH_KEY = filename under ~/.ssh (e.g. id_ed25519_work).
+            */
+            'tunnel' => [
+                'ssh_host' => env('MYSQL_SSH_HOST'),
+                'ssh_port' => env('MYSQL_SSH_PORT', 22),
+                'ssh_user' => env('MYSQL_SSH_USER'),
+                'ssh_key' => env('MYSQL_SSH_KEY'),
+                'ssh_key_dir' => env('MYSQL_SSH_KEY_DIR'),
+                'remote_db_host' => env('MYSQL_SSH_REMOTE_HOST', '127.0.0.1'),
+                'remote_db_port' => env('MYSQL_SSH_REMOTE_PORT', 3306),
+                'local_port' => env('MYSQL_SSH_LOCAL_PORT', env('MYSQL_REMOTE_PORT', 3307)),
+            ],
         ],
 
         'mongodb_ssh' => [

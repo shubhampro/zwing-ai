@@ -6,7 +6,18 @@ test('mysql_ssh connection is registered with correct driver', function () {
     $config = Config::get('database.connections.mysql_ssh');
 
     expect($config)->toBeArray()
-        ->and($config['driver'])->toBe('mysql');
+        ->and($config['driver'])->toBe('mysql')
+        ->and($config['host'])->toBe('127.0.0.1')
+        ->and($config)->toHaveKey('tunnel')
+        ->and($config['tunnel'])->toHaveKeys([
+            'ssh_host',
+            'ssh_port',
+            'ssh_user',
+            'ssh_key',
+            'remote_db_host',
+            'remote_db_port',
+            'local_port',
+        ]);
 });
 
 test('mongodb_ssh connection is registered with correct driver', function () {

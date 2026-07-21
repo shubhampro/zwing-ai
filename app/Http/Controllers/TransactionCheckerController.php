@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Organization;
 use App\Models\TransactionCheckerSession;
+use App\Services\SshTunnelManager;
 use App\Services\TransactionChecker\GrnChecker;
 use App\Services\TransactionChecker\GrtChecker;
 use App\Services\TransactionChecker\SstChecker;
@@ -84,6 +85,8 @@ class TransactionCheckerController extends Controller
 
         $org = Organization::findOrFail($request->integer('org_id'));
 
+        SshTunnelManager::ensureMysqlOpen();
+
         // Connect without a specific database to run SHOW DATABASES
         $baseConfig = Config::get('database.connections.mysql_ssh');
         $baseConfig['database'] = '';
@@ -144,6 +147,10 @@ class TransactionCheckerController extends Controller
      */
     private function runCheck(string $connection, string $txnType, int $orgId, string $database): array
     {
+        if ($connection === 'mysql_ssh') {
+            SshTunnelManager::ensureMysqlOpen();
+        }
+
         $config = Config::get("database.connections.{$connection}");
         $config['database'] = $database;
         Config::set("database.connections.{$connection}_dynamic", $config);

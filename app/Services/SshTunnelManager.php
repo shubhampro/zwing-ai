@@ -12,17 +12,62 @@ final class SshTunnelManager
     public static bool $fake = false;
 
     /**
+     * Ensure the MySQL SSH tunnel from config is open (lazy).
+     *
+     * Uses a private key from the SSH key directory (~/.ssh by default).
+     * If the local port is already listening, this is a no-op.
+     * If tunnel SSH settings are blank but the local port is up, assumes a
+     * manually opened tunnel (backward compatible).
+     */
+    public static function ensureMysqlOpen(): void
+    {
+        if (self::$fake) {
+            return;
+        }
+
+        /** @var array<string, mixed> $tunnel */
+        $tunnel = config('database.connections.mysql_ssh.tunnel', []);
+        $localPort = (int) ($tunnel['local_port'] ?? 3307);
+
+        if (self::isPortListening($localPort)) {
+            return;
+        }
+
+        $host = (string) ($tunnel['ssh_host'] ?? '');
+        $user = (string) ($tunnel['ssh_user'] ?? '');
+        $key = (string) ($tunnel['ssh_key'] ?? '');
+
+        if ($host === '' || $user === '' || $key === '') {
+            throw new RuntimeException(
+                'MySQL SSH tunnel is not open and MYSQL_SSH_HOST / MYSQL_SSH_USER / MYSQL_SSH_KEY are not configured.',
+            );
+        }
+
+        self::ensureOpen([
+            'ssh_host' => $host,
+            'ssh_port' => $tunnel['ssh_port'] ?? 22,
+            'ssh_user' => $user,
+            'ssh_key' => $key,
+            'ssh_key_dir' => $tunnel['ssh_key_dir'] ?? null,
+            'remote_db_host' => $tunnel['remote_db_host'] ?? '127.0.0.1',
+            'remote_db_port' => $tunnel['remote_db_port'] ?? 3306,
+            'local_port' => $localPort,
+        ]);
+    }
+
+    /**
      * Ensure an SSH tunnel is open for the given tunnel config.
      *
      * Checks whether the local_port is already accepting connections before
-     * attempting to spawn a new ssh process. The private key is written to a
-     * temporary file (mode 0600) and deleted immediately after the process starts.
+     * attempting to spawn a new ssh process. The private key is read from
+     * the SSH key directory (never pasted into the app).
      *
      * @param  array{
      *   ssh_host: string,
      *   ssh_port?: int|string|null,
      *   ssh_user: string,
-     *   ssh_private_key: string,
+     *   ssh_key: string,
+     *   ssh_key_dir?: string|null,
      *   remote_db_host: string,
      *   remote_db_port: int|string,
      *   local_port: int|string
@@ -40,14 +85,83 @@ final class SshTunnelManager
             return;
         }
 
-        $keyPath = self::writeKeyFile($tunnel['ssh_private_key']);
+        $keyPath = self::resolveKeyPath(
+            (string) $tunnel['ssh_key'],
+            $tunnel['ssh_key_dir'] ?? null,
+        );
 
-        try {
-            self::spawnTunnel($tunnel, $keyPath);
-            self::waitForPort($localPort);
-        } finally {
-            @unlink($keyPath);
+        self::spawnTunnel($tunnel, $keyPath);
+        self::waitForPort($localPort);
+    }
+
+    /**
+     * Resolve a key name/path to an absolute file under the SSH key directory.
+     */
+    public static function resolveKeyPath(string $key, ?string $keyDir = null): string
+    {
+        $key = trim($key);
+
+        if ($key === '') {
+            throw new RuntimeException('SSH key path is empty.');
         }
+
+        $sshDir = self::resolveSshKeyDir($keyDir);
+
+        if (str_starts_with($key, '~/')) {
+            $home = self::homeDirectory();
+            $key = $home.substr($key, 1);
+        }
+
+        if (! str_starts_with($key, DIRECTORY_SEPARATOR)) {
+            $key = $sshDir.DIRECTORY_SEPARATOR.basename($key);
+        }
+
+        $realKey = realpath($key);
+        $realDir = realpath($sshDir);
+
+        if ($realDir === false) {
+            throw new RuntimeException("SSH key directory does not exist: {$sshDir}");
+        }
+
+        if ($realKey === false || ! is_file($realKey)) {
+            throw new RuntimeException("SSH private key not found: {$key}");
+        }
+
+        $prefix = $realDir.DIRECTORY_SEPARATOR;
+
+        if (! str_starts_with($realKey, $prefix) && $realKey !== $realDir) {
+            throw new RuntimeException('SSH private key must live inside the SSH key directory.');
+        }
+
+        if (! is_readable($realKey)) {
+            throw new RuntimeException("SSH private key is not readable: {$realKey}");
+        }
+
+        return $realKey;
+    }
+
+    private static function resolveSshKeyDir(?string $keyDir): string
+    {
+        if (is_string($keyDir) && $keyDir !== '') {
+            if (str_starts_with($keyDir, '~/')) {
+                return self::homeDirectory().substr($keyDir, 1);
+            }
+
+            return rtrim($keyDir, DIRECTORY_SEPARATOR);
+        }
+
+        return self::homeDirectory().DIRECTORY_SEPARATOR.'.ssh';
+    }
+
+    private static function homeDirectory(): string
+    {
+        $home = $_SERVER['HOME'] ?? getenv('HOME') ?: null;
+
+        if (! is_string($home) || $home === '') {
+            throw new RuntimeException('Unable to determine home directory for SSH keys.');
+        }
+
+        return rtrim($home, DIRECTORY_SEPARATOR);
     }
 
     private static function isPortListening(int $port): bool
@@ -61,15 +175,6 @@ final class SshTunnelManager
         }
 
         return false;
-    }
-
-    private static function writeKeyFile(string $privateKey): string
-    {
-        $path = sys_get_temp_dir().'/ssh_key_'.bin2hex(random_bytes(8));
-        file_put_contents($path, $privateKey);
-        chmod($path, 0600);
-
-        return $path;
     }
 
     /**
@@ -97,10 +202,13 @@ final class SshTunnelManager
             '-L', "{$localPort}:{$remoteHost}:{$remotePort}",
             '-p', (string) $sshPort,
             '-i', $keyPath,
+            '-o', 'IdentitiesOnly=yes',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'BatchMode=yes',
             '-o', 'ConnectTimeout=10',
             '-o', 'ExitOnForwardFailure=yes',
+            '-o', 'ServerAliveInterval=30',
+            '-o', 'ServerAliveCountMax=3',
             "{$sshUser}@{$sshHost}",
         ];
 
