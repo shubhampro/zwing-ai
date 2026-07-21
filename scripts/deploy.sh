@@ -22,6 +22,7 @@ if ! php -m | grep -qi '^mongodb$'; then
 fi
 
 composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
 php artisan package:discover --ansi
 npm ci
 npm run build
