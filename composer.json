@@ -78,7 +78,7 @@
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
-            "@php artisan boost:update --ansi"
+            "@php -r \"$out=[]; exec(PHP_BINARY.' artisan list --raw 2>/dev/null', $out); if (!preg_grep('/^boost:update\\b/', $out)) { exit(0);} passthru(PHP_BINARY.' artisan boost:update --ansi', $code); exit($code);\""
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""

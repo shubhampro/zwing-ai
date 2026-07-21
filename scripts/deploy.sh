@@ -5,6 +5,9 @@ set -euo pipefail
 APP_DIR="${DEPLOY_PATH:-/var/www/zwing-ai}"
 BRANCH="${DEPLOY_BRANCH:-main}"
 
+export COMPOSER_ALLOW_SUPERUSER=1
+export COMPOSER_NO_INTERACTION=1
+
 cd "$APP_DIR"
 
 echo "==> Deploying $(basename "$APP_DIR") @ ${BRANCH}"
@@ -13,7 +16,13 @@ git fetch origin "$BRANCH"
 git checkout "$BRANCH"
 git reset --hard "origin/${BRANCH}"
 
-composer install --no-dev --optimize-autoloader --no-interaction
+if ! php -m | grep -qi '^mongodb$'; then
+  echo "ERROR: PHP ext-mongodb missing. Install: sudo apt-get install -y php8.4-mongodb"
+  exit 1
+fi
+
+composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+php artisan package:discover --ansi
 npm ci
 npm run build
 php artisan migrate --force

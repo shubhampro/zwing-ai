@@ -56,6 +56,9 @@ jobs:
           script: |
             set -euo pipefail
 
+            export COMPOSER_ALLOW_SUPERUSER=1
+            export COMPOSER_NO_INTERACTION=1
+
             APP_DIR="${DEPLOY_PATH:-/var/www/zwing-ai}"
             BRANCH="${DEPLOY_BRANCH:-main}"
 
@@ -67,7 +70,14 @@ jobs:
             git checkout "$BRANCH"
             git reset --hard "origin/${BRANCH}"
 
-            composer install --no-dev --optimize-autoloader --no-interaction
+            if ! php -m | grep -qi '^mongodb$'; then
+              echo "ERROR: PHP ext-mongodb missing. On server run:"
+              echo "  sudo apt-get install -y php8.4-mongodb && sudo systemctl reload php8.4-fpm"
+              exit 1
+            fi
+
+            composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+            php artisan package:discover --ansi
             npm ci
             npm run build
             php artisan migrate --force
