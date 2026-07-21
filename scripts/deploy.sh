@@ -24,6 +24,19 @@ fi
 composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
 php artisan package:discover --ansi
+
+export NVM_DIR="${HOME}/.nvm"
+if [ -s "${NVM_DIR}/nvm.sh" ]; then
+  # shellcheck disable=SC1091
+  . "${NVM_DIR}/nvm.sh"
+fi
+hash -r
+command -v npm >/dev/null || {
+  echo "ERROR: npm not found in non-interactive PATH. Install Node or fix nvm."
+  echo "PATH=${PATH}"
+  exit 1
+}
+
 npm ci
 npm run build
 php artisan migrate --force
