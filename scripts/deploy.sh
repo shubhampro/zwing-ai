@@ -24,6 +24,8 @@ fi
 composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
 php artisan package:discover --ansi
+# Stale route/config cache makes Wayfinder omit new routes during vite build.
+php artisan optimize:clear --no-interaction
 
 export NVM_DIR="${HOME}/.nvm"
 if [ -s "${NVM_DIR}/nvm.sh" ]; then
@@ -38,6 +40,7 @@ command -v npm >/dev/null || {
 }
 
 npm ci
+php artisan wayfinder:generate --no-interaction
 npm run build
 php artisan migrate --force
 php artisan optimize
