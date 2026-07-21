@@ -1,0 +1,57 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_BRANCH: ${{ vars.DEPLOY_BRANCH }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT != '' && secrets.SSH_PORT || 22 }}
+          script_stop: true
+          command_timeout: 20m
+          envs: DEPLOY_PATH,DEPLOY_BRANCH
+          script: |
+            set -euo pipefail
+
+            APP_DIR="${DEPLOY_PATH:-/var/www/zwing-ai}"
+            BRANCH="${DEPLOY_BRANCH:-main}"
+
+            cd "$APP_DIR"
+
+            echo "==> Deploy $(hostname) ${APP_DIR} @ ${BRANCH}"
+
+            git fetch origin "$BRANCH"
+            git checkout "$BRANCH"
+            git reset --hard "origin/${BRANCH}"
+
+            composer install --no-dev --optimize-autoloader --no-interaction
+            npm ci
+            npm run build
+            php artisan migrate --force
+            php artisan optimize
+            php artisan queue:restart
+
+            if command -v systemctl >/dev/null 2>&1; then
+              sudo -n systemctl reload php8.4-fpm 2>/dev/null || true
+            fi
+
+            echo "==> Deploy done: $(git rev-parse --short HEAD)"

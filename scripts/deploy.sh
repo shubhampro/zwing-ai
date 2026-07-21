@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Manual deploy on Ubuntu app server (same steps as GitHub Actions).
+APP_DIR="${DEPLOY_PATH:-/var/www/zwing-ai}"
+BRANCH="${DEPLOY_BRANCH:-main}"
+
+cd "$APP_DIR"
+
+echo "==> Deploying $(basename "$APP_DIR") @ ${BRANCH}"
+
+git fetch origin "$BRANCH"
+git checkout "$BRANCH"
+git reset --hard "origin/${BRANCH}"
+
+composer install --no-dev --optimize-autoloader --no-interaction
+npm ci
+npm run build
+php artisan migrate --force
+php artisan optimize
+php artisan queue:restart
+
+if command -v systemctl >/dev/null 2>&1; then
+  if sudo -n systemctl reload php8.4-fpm 2>/dev/null; then
+    echo "==> Reloaded php8.4-fpm"
+  fi
+fi
+
+echo "==> Deploy done: $(git rev-parse --short HEAD)"
