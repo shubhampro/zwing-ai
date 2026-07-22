@@ -68,8 +68,8 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            // Must exceed longest job timeout (external-query jobs use 900s).
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 960),
+            // Must exceed longest job timeout (jobs capped at 60s).
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
             'block_for' => null,
             'after_commit' => false,
         ],

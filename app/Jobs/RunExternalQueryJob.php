@@ -22,7 +22,7 @@ class RunExternalQueryJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 900;
+    public int $timeout = 60;
 
     public int $tries = 1;
 

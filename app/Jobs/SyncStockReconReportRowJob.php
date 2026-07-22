@@ -15,7 +15,7 @@ class SyncStockReconReportRowJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 300;
+    public int $timeout = 60;
 
     public int $tries = 1;
 
