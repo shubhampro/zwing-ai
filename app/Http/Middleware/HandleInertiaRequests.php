@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\QueueStatusReader;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -49,6 +50,9 @@ class HandleInertiaRequests extends Middleware
                     ? $user->getRoleNames()->values()->all()
                     : [],
             ],
+            'queueStatus' => $user
+                ? fn () => app(QueueStatusReader::class)->snapshot()
+                : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

@@ -24,6 +24,7 @@ import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
+import { QueueStatusWidget } from '@/components/queue-status';
 import {
     Sidebar,
     SidebarContent,
@@ -254,6 +255,7 @@ export function AppSidebar() {
 
             <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />
+                <QueueStatusWidget />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

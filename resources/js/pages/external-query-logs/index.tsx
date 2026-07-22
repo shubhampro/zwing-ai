@@ -12,6 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { formatDateTime } from '@/lib/datetime';
 import { dashboard } from '@/routes';
 import { index as externalQueryLogsIndex } from '@/routes/external-query-logs';
 import { show as stockReconShow } from '@/routes/stock-transaction-reconciliation';
@@ -87,17 +88,6 @@ const jobTypeLabel: Record<JobType, string> = {
     run_txn_checker: 'Run txn checker',
     server_health_check: 'Server health check',
 };
-
-function formatDate(iso: string | null): string {
-    if (!iso) {
-        return '—';
-    }
-
-    return new Date(iso).toLocaleString(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    });
-}
 
 function formatMs(ms: number | null): string {
     if (ms === null) {
@@ -327,7 +317,7 @@ export default function ExternalQueryLogsIndex({
                                         {formatMs(log.erp_query_ms)}
                                     </td>
                                     <td className="px-3 py-2.5 text-muted-foreground">
-                                        {formatDate(log.created_at)}
+                                        {formatDateTime(log.created_at)}
                                     </td>
                                     <td className="max-w-[240px] px-3 py-2.5 text-xs text-destructive">
                                         {log.failure_reason ?? '—'}
