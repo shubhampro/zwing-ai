@@ -2,10 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Enums\ExternalQueryStatus;
+use App\Models\ExternalQueryLog;
 use App\Models\Organization;
 use App\Models\OrganizationDatabaseConnection;
 use App\Models\StockReconSession;
 use App\Services\OrganizationDatabaseConnector;
+use App\Support\ExternalQueryQueue;
 use App\Support\Sprefcode;
 use App\Support\StockReconciliationConnectionQueries;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -30,13 +33,17 @@ class PullStockReconciliationFromConnections implements ShouldQueue
         public readonly ?int $pgsqlConnectionId,
         public readonly bool $includeZwing,
         public readonly bool $includeErp,
+        public readonly ?int $externalQueryLogId = null,
     ) {
-        $this->onQueue(StockReconSession::CONNECTION_QUEUE);
+        $this->onQueue(ExternalQueryQueue::NAME);
     }
 
     public function handle(OrganizationDatabaseConnector $connector): void
     {
         $session = StockReconSession::query()->findOrFail($this->sessionId);
+        $log = $this->externalQueryLog();
+        $log?->markProcessing();
+
         $session->update([
             'status' => 'processing',
             'failure_reason' => null,
@@ -111,6 +118,18 @@ class PullStockReconciliationFromConnections implements ShouldQueue
                 'failure_reason' => null,
                 'reconciled_at' => now(),
             ]);
+
+            $session->refresh();
+
+            $log?->markCompleted(
+                result: [
+                    'session_id' => $session->id,
+                    'zwing_row_count' => $session->zwing_row_count,
+                    'erp_row_count' => $session->erp_row_count,
+                ],
+                zwingQueryMs: $session->zwing_query_ms,
+                erpQueryMs: $session->erp_query_ms,
+            );
         } catch (Throwable $exception) {
             $this->markFailed($exception);
 
@@ -139,6 +158,21 @@ class PullStockReconciliationFromConnections implements ShouldQueue
                 'status' => 'failed',
                 'failure_reason' => $this->safeFailureReason($exception),
             ]);
+
+        $log = $this->externalQueryLog();
+
+        if ($log !== null && $log->status !== ExternalQueryStatus::Failed) {
+            $log->markFailed($exception);
+        }
+    }
+
+    private function externalQueryLog(): ?ExternalQueryLog
+    {
+        if ($this->externalQueryLogId === null) {
+            return null;
+        }
+
+        return ExternalQueryLog::query()->find($this->externalQueryLogId);
     }
 
     private function safeFailureReason(Throwable $exception): string

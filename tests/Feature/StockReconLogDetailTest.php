@@ -41,7 +41,7 @@ test('log detail service matches sprefcode by numeric suffix', function () {
         'qty' => 5,
     ]);
 
-    $result = (new StockReconLogDetailService)->forSku(
+    $result = app(StockReconLogDetailService::class)->forSku(
         session: $session,
         siteCode: '11',
         icode: 'SKU1',
@@ -113,7 +113,7 @@ test('log detail service splits matched and mismatch by doc_no and qty', functio
         'qty' => 2,
     ]);
 
-    $result = (new StockReconLogDetailService)->forSku(
+    $result = app(StockReconLogDetailService::class)->forSku(
         session: $session,
         siteCode: 'SC1',
         icode: 'SKU1',
@@ -161,7 +161,9 @@ test('authenticated user can fetch report log details json', function () {
         ]))
         ->assertOk()
         ->assertJsonPath('has_zwing_logs', true)
-        ->assertJsonPath('mismatch.zwing.0.doc_no', 'D1');
+        ->assertJsonPath('mismatch.zwing.0.doc_no', 'D1')
+        ->assertJsonPath('zwing_query_ms', null)
+        ->assertJsonPath('erp_query_ms', null);
 });
 
 test('users cannot fetch log details for another users session', function () {

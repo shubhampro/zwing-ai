@@ -5,6 +5,7 @@ use App\Models\Organization;
 use App\Models\OrganizationDatabaseConnection;
 use App\Models\StockReconSession;
 use App\Models\User;
+use App\Support\ExternalQueryQueue;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -70,17 +71,19 @@ test('connection pull creates session and dispatches job using mysql_ssh', funct
         ->and($session->v_id)->toBe(555)
         ->and($session->source)->toBe('connection')
         ->and($session->organization_id)->toBe($organization->id)
+        ->and($session->pgsql_connection_id)->toBe($pgsql->id)
         ->and($session->zwing_file_name)->toBe('mysql_ssh')
         ->and($session->erp_file_name)->toBe('pgsql connection')
         ->and($session->status)->toBe('pending');
 
     Queue::assertPushedOn(
-        StockReconSession::CONNECTION_QUEUE,
+        ExternalQueryQueue::NAME,
         PullStockReconciliationFromConnections::class,
         fn (PullStockReconciliationFromConnections $job) => $job->sessionId === $session->id
             && $job->pgsqlConnectionId === $pgsql->id
             && $job->includeZwing === true
-            && $job->includeErp === true,
+            && $job->includeErp === true
+            && $job->externalQueryLogId !== null,
     );
 });
 

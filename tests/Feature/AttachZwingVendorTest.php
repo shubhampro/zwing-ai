@@ -40,10 +40,11 @@ it('lists zwing vendors and attached vendor ids', function () {
 
     actingAs($this->user)
         ->getJson('/organizations/zwing-vendors')
-        ->assertOk()
-        ->assertJsonPath('vendors.0.id', 100)
-        ->assertJsonPath('vendors.1.name', 'SAREE SANSAR')
-        ->assertJsonPath('attached_vendor_ids', [100]);
+        ->assertStatus(202)
+        ->assertJsonPath('status', 'completed')
+        ->assertJsonPath('result.vendors.0.id', 100)
+        ->assertJsonPath('result.vendors.1.name', 'SAREE SANSAR')
+        ->assertJsonPath('result.attached_vendor_ids', [100]);
 });
 
 it('attaches an organization from a zwing vendor', function () {
@@ -57,8 +58,10 @@ it('attaches an organization from a zwing vendor', function () {
     });
 
     actingAs($this->user)
-        ->post('/organizations/attach-zwing-vendor', ['vendor_id' => 293])
-        ->assertRedirect('/organizations');
+        ->postJson('/organizations/attach-zwing-vendor', ['vendor_id' => 293])
+        ->assertStatus(202)
+        ->assertJsonPath('status', 'completed')
+        ->assertJsonPath('result.vendor_id', 293);
 
     assertDatabaseHas('organizations', [
         'vendor_id' => 293,
@@ -81,8 +84,9 @@ it('rejects attaching a duplicate vendor id', function () {
     });
 
     actingAs($this->user)
-        ->post('/organizations/attach-zwing-vendor', ['vendor_id' => 293])
-        ->assertSessionHasErrors(['vendor_id']);
+        ->postJson('/organizations/attach-zwing-vendor', ['vendor_id' => 293])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['vendor_id']);
 });
 
 it('rejects attaching an unknown remote vendor', function () {
@@ -91,8 +95,10 @@ it('rejects attaching an unknown remote vendor', function () {
     });
 
     actingAs($this->user)
-        ->post('/organizations/attach-zwing-vendor', ['vendor_id' => 999])
-        ->assertSessionHasErrors(['vendor_id']);
+        ->postJson('/organizations/attach-zwing-vendor', ['vendor_id' => 999])
+        ->assertStatus(202)
+        ->assertJsonPath('status', 'failed')
+        ->assertJsonPath('failure_reason', 'Vendor not found in Zwing Master.');
 });
 
 it('rejects attaching when ba code already exists', function () {
@@ -108,8 +114,9 @@ it('rejects attaching when ba code already exists', function () {
     });
 
     actingAs($this->user)
-        ->post('/organizations/attach-zwing-vendor', ['vendor_id' => 293])
-        ->assertSessionHasErrors(['vendor_id']);
+        ->postJson('/organizations/attach-zwing-vendor', ['vendor_id' => 293])
+        ->assertStatus(202)
+        ->assertJsonPath('status', 'failed');
 });
 
 it('requires authentication to attach a zwing vendor', function () {

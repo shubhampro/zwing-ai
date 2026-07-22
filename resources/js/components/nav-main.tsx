@@ -83,10 +83,24 @@ function NavMenuItem({ item }: { item: NavItem }) {
                                                 isCurrentOrParentUrl(child.href)
                                             }
                                         >
-                                            <Link href={child.href} prefetch>
-                                                {child.icon && <child.icon />}
-                                                <span>{child.title}</span>
-                                            </Link>
+                                            {child.external ? (
+                                                <a href={String(child.href)}>
+                                                    {child.icon && (
+                                                        <child.icon />
+                                                    )}
+                                                    <span>{child.title}</span>
+                                                </a>
+                                            ) : (
+                                                <Link
+                                                    href={child.href}
+                                                    prefetch
+                                                >
+                                                    {child.icon && (
+                                                        <child.icon />
+                                                    )}
+                                                    <span>{child.title}</span>
+                                                </Link>
+                                            )}
                                         </SidebarMenuSubButton>
                                     ) : null}
                                 </SidebarMenuSubItem>
@@ -111,10 +125,17 @@ function NavMenuItem({ item }: { item: NavItem }) {
                 }
                 tooltip={{ children: item.title }}
             >
-                <Link href={item.href} prefetch>
-                    {item.icon && <item.icon />}
-                    <span>{item.title}</span>
-                </Link>
+                {item.external ? (
+                    <a href={String(item.href)}>
+                        {item.icon && <item.icon />}
+                        <span>{item.title}</span>
+                    </a>
+                ) : (
+                    <Link href={item.href} prefetch>
+                        {item.icon && <item.icon />}
+                        <span>{item.title}</span>
+                    </Link>
+                )}
             </SidebarMenuButton>
         </SidebarMenuItem>
     );

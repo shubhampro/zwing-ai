@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'v_id',
     'source',
     'organization_id',
+    'pgsql_connection_id',
     'zwing_file_name',
     'erp_file_name',
     'zwing_log_file_name',
@@ -37,8 +38,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class StockReconSession extends Model
 {
-    public const CONNECTION_QUEUE = 'stock-recon-connections';
-
     protected function casts(): array
     {
         return [
@@ -56,6 +55,11 @@ class StockReconSession extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function pgsqlConnection(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationDatabaseConnection::class, 'pgsql_connection_id');
     }
 
     public function zwingLogs(): HasMany

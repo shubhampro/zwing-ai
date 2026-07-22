@@ -12,5 +12,8 @@ export type NavItem = {
     icon?: LucideIcon | null;
     isActive?: boolean;
     permission?: string;
+    role?: string;
+    /** Full-page / non-Inertia destinations (e.g. Horizon). */
+    external?: boolean;
     items?: NavItem[];
 };

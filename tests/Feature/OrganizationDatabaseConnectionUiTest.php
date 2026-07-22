@@ -177,8 +177,11 @@ it('allows admins to test a database connection', function () {
     });
 
     actingAs($admin)
-        ->post(route('organizations.database-connections.test', [$this->organization, $connection]))
-        ->assertRedirect(route('organizations.database-connections.index', $this->organization));
+        ->postJson(route('organizations.database-connections.test', [$this->organization, $connection]))
+        ->assertStatus(202)
+        ->assertJsonPath('status', 'completed')
+        ->assertJsonPath('job_type', 'test_org_db_connection')
+        ->assertJsonPath('result.ok', true);
 });
 
 it('forbids operators from testing database connections', function () {

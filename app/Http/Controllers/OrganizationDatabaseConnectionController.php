@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DatabaseConnectionType;
+use App\Enums\ExternalQueryJobType;
 use App\Http\Requests\StoreOrganizationDatabaseConnectionRequest;
 use App\Http\Requests\UpdateOrganizationDatabaseConnectionRequest;
 use App\Models\Organization;
 use App\Models\OrganizationDatabaseConnection;
-use App\Services\OrganizationDatabaseConnectionTester;
+use App\Services\ExternalQueryDispatcher;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -120,23 +122,21 @@ class OrganizationDatabaseConnectionController extends Controller
         Request $request,
         Organization $organization,
         OrganizationDatabaseConnection $organizationDatabaseConnection,
-        OrganizationDatabaseConnectionTester $tester,
-    ): RedirectResponse {
+        ExternalQueryDispatcher $dispatcher,
+    ): JsonResponse {
         abort_if($organizationDatabaseConnection->organization_id !== $organization->id, 404);
 
         $this->authorize('view', $organizationDatabaseConnection);
 
-        $result = $tester->test($organizationDatabaseConnection);
+        $log = $dispatcher->dispatch(
+            jobType: ExternalQueryJobType::TestOrgDbConnection,
+            user: $request->user(),
+            context: [
+                'organization_id' => $organization->id,
+                'organization_database_connection_id' => $organizationDatabaseConnection->id,
+            ],
+        );
 
-        $message = $result['ok']
-            ? $result['message'].($result['latency_ms'] !== null ? " ({$result['latency_ms']} ms)" : '')
-            : $result['message'];
-
-        Inertia::flash('toast', [
-            'type' => $result['ok'] ? 'success' : 'error',
-            'message' => $message,
-        ]);
-
-        return redirect()->route('organizations.database-connections.index', $organization);
+        return response()->json($log->toPollPayload(), 202);
     }
 }

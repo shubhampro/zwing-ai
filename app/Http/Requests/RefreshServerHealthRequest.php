@@ -2,14 +2,14 @@
 
 namespace App\Http\Requests;
 
-use App\Support\Permissions;
+use App\Enums\Role;
 use Illuminate\Foundation\Http\FormRequest;
 
 class RefreshServerHealthRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can(Permissions::ServerHealthManage) ?? false;
+        return $this->user()?->hasRole(Role::Admin) ?? false;
     }
 
     /**

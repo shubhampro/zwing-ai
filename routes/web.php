@@ -4,6 +4,7 @@ use App\Enums\Role;
 use App\Http\Controllers\Auth\InviteRegistrationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseCashReconciliationController;
+use App\Http\Controllers\ExternalQueryLogController;
 use App\Http\Controllers\InboundEventsRunnerController;
 use App\Http\Controllers\InviteController;
 use App\Http\Controllers\InvoiceReconciliationController;
@@ -113,6 +114,14 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
             ->name('organizations.database-connections.test');
         Route::delete('organizations/{organization}/database-connections/{organizationDatabaseConnection}', [OrganizationDatabaseConnectionController::class, 'destroy'])
             ->name('organizations.database-connections.destroy');
+
+        Route::get('external-query-logs', [ExternalQueryLogController::class, 'index'])
+            ->name('external-query-logs.index');
+
+        Route::get('server-health', [ServerHealthController::class, 'index'])
+            ->name('server-health.index');
+        Route::post('server-health/refresh', [ServerHealthController::class, 'refresh'])
+            ->name('server-health.refresh');
     });
 
     Route::get('third-party-apis', [ThirdPartyApiController::class, 'index'])
@@ -198,6 +207,11 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::get('stock-transaction-reconciliation/{stockReconSession}/report/log-details', [StockTransactionReconciliationController::class, 'reportLogDetails'])
         ->middleware('permission:'.Permissions::StockReconView)
         ->name('stock-transaction-reconciliation.report.log-details');
+    Route::post('stock-transaction-reconciliation/{stockReconSession}/report/sync-row', [StockTransactionReconciliationController::class, 'syncReportRow'])
+        ->middleware('permission:'.Permissions::StockReconManage)
+        ->name('stock-transaction-reconciliation.report.sync-row');
+    Route::get('external-query-logs/{externalQueryLog}', [ExternalQueryLogController::class, 'show'])
+        ->name('external-query-logs.show');
     Route::get('stock-transaction-reconciliation/{stockReconSession}/zwing-logs', [StockTransactionReconciliationController::class, 'zwingLogs'])
         ->middleware('permission:'.Permissions::StockReconView)
         ->name('stock-transaction-reconciliation.zwing-logs');
@@ -278,13 +292,6 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::post('outbound-sync/fetch', [OutboundSyncController::class, 'fetch'])
         ->middleware('permission:'.Permissions::OutboundSyncManage)
         ->name('outbound-sync.fetch');
-
-    Route::middleware('permission:'.Permissions::ServerHealthView)->group(function () {
-        Route::get('server-health', [ServerHealthController::class, 'index'])->name('server-health.index');
-    });
-    Route::post('server-health/refresh', [ServerHealthController::class, 'refresh'])
-        ->middleware('permission:'.Permissions::ServerHealthManage)
-        ->name('server-health.refresh');
 
     Route::get('sql-queries', [SqlQueryController::class, 'index'])
         ->middleware('permission:'.Permissions::SqlQueriesView)

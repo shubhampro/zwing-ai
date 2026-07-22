@@ -1,9 +1,9 @@
 <?php
 
+use App\Enums\Role;
 use App\Models\DbHealthCheck;
 use App\Models\User;
 use App\Services\DbHealth\DbHealthChecker;
-use App\Support\Permissions;
 use Illuminate\Support\Facades\Cache;
 
 use function Pest\Laravel\actingAs;
@@ -37,8 +37,8 @@ it('forbids operators and viewers from viewing server health', function () {
     actingAs($operator)->get(route('server-health.index'))->assertForbidden();
     actingAs($viewer)->get(route('server-health.index'))->assertForbidden();
 
-    expect($operator->can(Permissions::ServerHealthView))->toBeFalse()
-        ->and($viewer->can(Permissions::ServerHealthView))->toBeFalse();
+    expect($operator->hasRole(Role::Admin))->toBeFalse()
+        ->and($viewer->hasRole(Role::Admin))->toBeFalse();
 });
 
 it('forbids operators from refreshing server health', function () {
@@ -53,8 +53,10 @@ it('runs refresh and stores history for admins', function () {
     $admin = User::factory()->admin()->create();
 
     actingAs($admin)
-        ->post(route('server-health.refresh'))
-        ->assertRedirect();
+        ->postJson(route('server-health.refresh'))
+        ->assertStatus(202)
+        ->assertJsonPath('status', 'completed')
+        ->assertJsonPath('job_type', 'server_health_check');
 
     expect(DbHealthCheck::query()->count())->toBe(1)
         ->and(Cache::has(config('server_health.cache_key')))->toBeTrue();
@@ -75,9 +77,9 @@ it('skips refresh when cache is still fresh', function () {
     expect(DbHealthCheck::query()->count())->toBe(1);
 
     actingAs($admin)
-        ->post(route('server-health.refresh'))
-        ->assertRedirect()
-        ->assertSessionHas('info');
+        ->postJson(route('server-health.refresh'))
+        ->assertStatus(409)
+        ->assertJsonPath('message', 'Cached snapshot still fresh. Wait for TTL before refreshing.');
 
     expect(DbHealthCheck::query()->count())->toBe(1);
 });
@@ -89,9 +91,9 @@ it('skips refresh when lock is held', function () {
 
     try {
         actingAs($admin)
-            ->post(route('server-health.refresh'))
-            ->assertRedirect()
-            ->assertSessionHas('error');
+            ->postJson(route('server-health.refresh'))
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'A health check is already running. Try again shortly.');
     } finally {
         $lock->release();
     }

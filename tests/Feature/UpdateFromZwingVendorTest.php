@@ -30,8 +30,10 @@ it('updates an existing organization from zwing master', function () {
     });
 
     actingAs($this->user)
-        ->post('/organizations/update-zwing-vendor', ['vendor_id' => 293])
-        ->assertRedirect('/organizations');
+        ->postJson('/organizations/update-zwing-vendor', ['vendor_id' => 293])
+        ->assertStatus(202)
+        ->assertJsonPath('status', 'completed')
+        ->assertJsonPath('result.organization_id', $organization->id);
 
     $organization->refresh();
 
@@ -50,8 +52,9 @@ it('rejects update when vendor is not attached', function () {
     });
 
     actingAs($this->user)
-        ->post('/organizations/update-zwing-vendor', ['vendor_id' => 999])
-        ->assertSessionHasErrors(['vendor_id']);
+        ->postJson('/organizations/update-zwing-vendor', ['vendor_id' => 999])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['vendor_id']);
 });
 
 it('rejects update when remote vendor is missing', function () {
@@ -62,8 +65,10 @@ it('rejects update when remote vendor is missing', function () {
     });
 
     actingAs($this->user)
-        ->post('/organizations/update-zwing-vendor', ['vendor_id' => 50])
-        ->assertSessionHasErrors(['vendor_id']);
+        ->postJson('/organizations/update-zwing-vendor', ['vendor_id' => 50])
+        ->assertStatus(202)
+        ->assertJsonPath('status', 'failed')
+        ->assertJsonPath('failure_reason', 'Vendor not found in Zwing Master.');
 });
 
 it('rejects update when ba code belongs to another organization', function () {
@@ -80,8 +85,9 @@ it('rejects update when ba code belongs to another organization', function () {
     });
 
     actingAs($this->user)
-        ->post('/organizations/update-zwing-vendor', ['vendor_id' => 293])
-        ->assertSessionHasErrors(['vendor_id']);
+        ->postJson('/organizations/update-zwing-vendor', ['vendor_id' => 293])
+        ->assertStatus(202)
+        ->assertJsonPath('status', 'failed');
 });
 
 it('requires authentication to update from zwing', function () {

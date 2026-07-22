@@ -6,10 +6,11 @@ import {
     FileText,
     Filter,
     Loader2,
+    RefreshCw,
     Search,
     X,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,12 +30,18 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { useCan } from '@/hooks/use-can';
+import {
+    isExternalQueryPollPayload,
+    waitForExternalQuery,
+} from '@/lib/external-query';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { copyToClipboard } from '@/lib/copy-to-clipboard';
 import {
     exportMethod,
     logDetails,
+    syncRow,
 } from '@/routes/stock-transaction-reconciliation/report';
 import { index, report, show } from '@/routes/stock-transaction-reconciliation';
 
@@ -62,9 +69,52 @@ type LogEntry = {
 type LogDetailResponse = {
     has_zwing_logs: boolean;
     has_erp_logs: boolean;
+    zwing_query_ms: number | null;
+    erp_query_ms: number | null;
     matched: { zwing: LogEntry[]; erp: LogEntry[] };
     mismatch: { zwing: LogEntry[]; erp: LogEntry[] };
 };
+
+type SyncRowResponse = {
+    site_code: string;
+    icode: string;
+    batch_no: string;
+    sprefcode: string;
+    stock_point_name: string | null;
+    zwing_qty: number | null;
+    erp_qty: number | null;
+    match_status: MatchStatus | null;
+    removed: boolean;
+    zwing_query_ms: number | null;
+    erp_query_ms: number | null;
+};
+
+function reportRowKey(
+    row: Pick<ReportRow, 'site_code' | 'icode' | 'batch_no' | 'sprefcode'>,
+): string {
+    return `${row.site_code}|${row.icode}|${row.batch_no ?? ''}|${row.sprefcode}`;
+}
+
+function formatLogQueryDuration(ms: number | null): string | null {
+    if (ms === null) {
+        return null;
+    }
+
+    if (ms < 1000) {
+        return `${ms} ms`;
+    }
+
+    const totalSeconds = ms / 1000;
+
+    if (totalSeconds < 60) {
+        return `${totalSeconds.toFixed(totalSeconds < 10 ? 1 : 0)} s`;
+    }
+
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.round(totalSeconds % 60);
+
+    return `${minutes}m ${seconds}s`;
+}
 
 type Summary = {
     total: number;
@@ -89,6 +139,9 @@ type Props = {
         name: string;
         v_id: number;
         status: string;
+        source: string | null;
+        zwing_file_name: string | null;
+        erp_file_name: string | null;
         zwing_log_file_name: string | null;
         erp_log_file_name: string | null;
     };
@@ -205,14 +258,25 @@ function LogSideTable({
     title,
     rows,
     emptyMessage,
+    queryMs,
 }: {
     title: string;
     rows: LogEntry[];
     emptyMessage: string;
+    queryMs: number | null;
 }) {
+    const durationLabel = formatLogQueryDuration(queryMs);
+
     return (
         <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium">{title}</p>
+            <div className="flex items-baseline justify-between gap-2">
+                <p className="text-sm font-medium">{title}</p>
+                {durationLabel !== null && (
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                        Query {durationLabel}
+                    </p>
+                )}
+            </div>
             <div className="overflow-x-auto rounded-md border">
                 <table className="w-full text-sm">
                     <thead>
@@ -289,6 +353,9 @@ export default function StockTransactionReconciliationReport({
     siteCodeOptions,
     stockPointOptions,
 }: Props) {
+    const can = useCan();
+    const [tableRows, setTableRows] = useState(rows);
+    const [syncingKey, setSyncingKey] = useState<string | null>(null);
     const [icodeQuery, setIcodeQuery] = useState(initialFilters.icode_query);
     const [siteCode, setSiteCode] = useState(
         initialFilters.site_code || ANY_SITE_CODE,
@@ -299,6 +366,10 @@ export default function StockTransactionReconciliationReport({
     const [difference, setDifference] = useState<DifferenceFilter>(
         initialFilters.difference,
     );
+
+    useEffect(() => {
+        setTableRows(rows);
+    }, [rows]);
 
     const activeFilters = useMemo(() => {
         return {
@@ -362,10 +433,14 @@ export default function StockTransactionReconciliationReport({
         return query;
     }, [activeFilters]);
 
-    const hasAnyLogs =
-        session.zwing_log_file_name !== null ||
-        session.erp_log_file_name !== null;
+    const isConnection = (session.source ?? 'csv') === 'connection';
+    const hasAnyLogs = isConnection
+        ? session.zwing_file_name !== null || session.erp_file_name !== null
+        : session.zwing_log_file_name !== null ||
+          session.erp_log_file_name !== null;
     const showLogActions = filter === 'qty_mismatch' && hasAnyLogs;
+    const showSyncActions = isConnection && can('stock-recon.manage');
+    const showActions = showLogActions || showSyncActions;
 
     const [logModalOpen, setLogModalOpen] = useState(false);
     const [logModalTab, setLogModalTab] = useState<'matched' | 'mismatch'>(
@@ -376,6 +451,16 @@ export default function StockTransactionReconciliationReport({
         useState<LogDetailResponse | null>(null);
     const [logDetailsLoading, setLogDetailsLoading] = useState(false);
     const [logDetailsError, setLogDetailsError] = useState<string | null>(null);
+
+    const [syncModalOpen, setSyncModalOpen] = useState(false);
+    const [syncModalRow, setSyncModalRow] = useState<ReportRow | null>(null);
+    const [syncModalBefore, setSyncModalBefore] = useState<ReportRow | null>(
+        null,
+    );
+    const [syncModalResult, setSyncModalResult] =
+        useState<SyncRowResponse | null>(null);
+    const [syncModalLoading, setSyncModalLoading] = useState(false);
+    const [syncModalError, setSyncModalError] = useState<string | null>(null);
 
     const loadLogDetails = useCallback(
         async (row: ReportRow) => {
@@ -401,11 +486,26 @@ export default function StockTransactionReconciliationReport({
                     credentials: 'same-origin',
                 });
 
-                if (!response.ok) {
+                if (!response.ok && response.status !== 202) {
                     throw new Error('Failed to load log details.');
                 }
 
-                const data = (await response.json()) as LogDetailResponse;
+                const payload = (await response.json()) as
+                    | LogDetailResponse
+                    | Awaited<ReturnType<typeof waitForExternalQuery>>;
+
+                let data: LogDetailResponse;
+
+                if (isExternalQueryPollPayload(payload)) {
+                    const settled =
+                        payload.status === 'completed'
+                            ? payload
+                            : await waitForExternalQuery(payload.id);
+                    data = settled.result as LogDetailResponse;
+                } else {
+                    data = payload;
+                }
+
                 setLogDetailsData(data);
 
                 const matchedCount =
@@ -439,6 +539,119 @@ export default function StockTransactionReconciliationReport({
         setSelectedRow(null);
         setLogDetailsData(null);
         setLogDetailsError(null);
+    }
+
+    function openSyncModal(row: ReportRow) {
+        setSyncModalRow(row);
+        setSyncModalBefore({ ...row });
+        setSyncModalResult(null);
+        setSyncModalError(null);
+        setSyncModalOpen(true);
+        void syncReportRow(row);
+    }
+
+    function closeSyncModal() {
+        setSyncModalOpen(false);
+        setSyncModalRow(null);
+        setSyncModalBefore(null);
+        setSyncModalResult(null);
+        setSyncModalError(null);
+        setSyncModalLoading(false);
+        setSyncingKey(null);
+    }
+
+    async function syncReportRow(row: ReportRow) {
+        const key = reportRowKey(row);
+        setSyncingKey(key);
+        setSyncModalLoading(true);
+        setSyncModalError(null);
+        setSyncModalResult(null);
+
+        try {
+            const xsrfToken = decodeURIComponent(
+                document.cookie
+                    .split('; ')
+                    .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
+                    ?.split('=')[1] ?? '',
+            );
+
+            const response = await fetch(syncRow.url(session.id), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-XSRF-TOKEN': xsrfToken,
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    site_code: row.site_code,
+                    icode: row.icode,
+                    batch_no: row.batch_no ?? '',
+                    sprefcode: row.sprefcode,
+                }),
+            });
+
+            if (!response.ok && response.status !== 202) {
+                throw new Error('Failed to sync row.');
+            }
+
+            const payload = await response.json();
+
+            if (!isExternalQueryPollPayload(payload)) {
+                throw new Error('Unexpected sync response.');
+            }
+
+            const settled =
+                payload.status === 'completed'
+                    ? payload
+                    : await waitForExternalQuery(payload.id);
+
+            const data = settled.result as SyncRowResponse;
+            setSyncModalResult(data);
+
+            if (data.removed) {
+                setTableRows((current) =>
+                    current.filter((item) => reportRowKey(item) !== key),
+                );
+                return;
+            }
+
+            setTableRows((current) =>
+                current.map((item) =>
+                    reportRowKey(item) === key
+                        ? {
+                              ...item,
+                              stock_point_name:
+                                  data.stock_point_name ??
+                                  item.stock_point_name,
+                              zwing_qty: data.zwing_qty,
+                              erp_qty: data.erp_qty,
+                              match_status:
+                                  data.match_status ?? item.match_status,
+                          }
+                        : item,
+                ),
+            );
+            setSyncModalRow((current) =>
+                current && reportRowKey(current) === key
+                    ? {
+                          ...current,
+                          stock_point_name:
+                              data.stock_point_name ?? current.stock_point_name,
+                          zwing_qty: data.zwing_qty,
+                          erp_qty: data.erp_qty,
+                          match_status:
+                              data.match_status ?? current.match_status,
+                      }
+                    : current,
+            );
+        } catch {
+            setSyncModalError('Could not sync this row from connections.');
+        } finally {
+            setSyncModalLoading(false);
+            setSyncingKey(null);
+        }
     }
 
     function navigateWithFilters(
@@ -914,18 +1127,18 @@ export default function StockTransactionReconciliationReport({
                                     <th className="px-4 py-3 font-medium">
                                         Status
                                     </th>
-                                    {showLogActions && (
+                                    {showActions && (
                                         <th className="px-4 py-3 font-medium">
-                                            Logs
+                                            Actions
                                         </th>
                                     )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {rows.length === 0 && (
+                                {tableRows.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={showLogActions ? 10 : 9}
+                                            colSpan={showActions ? 10 : 9}
                                             className="px-4 py-12 text-center"
                                         >
                                             <p className="text-sm font-medium">
@@ -948,7 +1161,9 @@ export default function StockTransactionReconciliationReport({
                                         </td>
                                     </tr>
                                 )}
-                                {rows.map((row, i) => {
+                                {tableRows.map((row) => {
+                                    const key = reportRowKey(row);
+                                    const isSyncing = syncingKey === key;
                                     const diff =
                                         row.zwing_qty !== null &&
                                         row.erp_qty !== null
@@ -957,7 +1172,7 @@ export default function StockTransactionReconciliationReport({
 
                                     return (
                                         <tr
-                                            key={i}
+                                            key={key}
                                             className="hover:bg-muted/30"
                                         >
                                             <td className="px-4 py-2.5">
@@ -1025,19 +1240,47 @@ export default function StockTransactionReconciliationReport({
                                                     }
                                                 </Badge>
                                             </td>
-                                            {showLogActions && (
+                                            {showActions && (
                                                 <td className="px-4 py-2.5">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            openLogModal(row)
-                                                        }
-                                                    >
-                                                        <FileText className="size-3.5" />
-                                                        View logs
-                                                    </Button>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        {showSyncActions && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                disabled={
+                                                                    isSyncing
+                                                                }
+                                                                onClick={() =>
+                                                                    openSyncModal(
+                                                                        row,
+                                                                    )
+                                                                }
+                                                            >
+                                                                {isSyncing ? (
+                                                                    <Loader2 className="size-3.5 animate-spin" />
+                                                                ) : (
+                                                                    <RefreshCw className="size-3.5" />
+                                                                )}
+                                                                Sync
+                                                            </Button>
+                                                        )}
+                                                        {showLogActions && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    openLogModal(
+                                                                        row,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <FileText className="size-3.5" />
+                                                                View logs
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             )}
                                         </tr>
@@ -1123,8 +1366,10 @@ export default function StockTransactionReconciliationReport({
                                         </p>
                                         <p className="text-xs">
                                             Match logs on doc_no + qty · filter
-                                            on icode, site_code, sprefcode,
-                                            batch_no
+                                            on icode, site_code, sprefcode
+                                            {isConnection
+                                                ? ' · live from connections'
+                                                : ', batch_no'}
                                         </p>
                                     </>
                                 )}
@@ -1170,9 +1415,13 @@ export default function StockTransactionReconciliationReport({
                     </div>
 
                     {logDetailsLoading && (
-                        <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
                             <Loader2 className="size-5 animate-spin" />
-                            Loading log entries…
+                            <p className="text-sm">
+                                {isConnection
+                                    ? 'Queued on external-query… loading logs…'
+                                    : 'Loading log entries…'}
+                            </p>
                         </div>
                     )}
 
@@ -1189,21 +1438,191 @@ export default function StockTransactionReconciliationReport({
                                 <LogSideTable
                                     title="Zwing"
                                     rows={activeZwingLogs}
+                                    queryMs={logDetailsData.zwing_query_ms}
                                     emptyMessage={
                                         logDetailsData.has_zwing_logs
                                             ? 'No entries in this group.'
-                                            : 'No Zwing log file uploaded.'
+                                            : isConnection
+                                              ? 'Zwing connection not included in this session.'
+                                              : 'No Zwing log file uploaded.'
                                     }
                                 />
                                 <LogSideTable
                                     title="ERP"
                                     rows={activeErpLogs}
+                                    queryMs={logDetailsData.erp_query_ms}
                                     emptyMessage={
                                         logDetailsData.has_erp_logs
                                             ? 'No entries in this group.'
-                                            : 'No ERP log file uploaded.'
+                                            : isConnection
+                                              ? 'ERP connection not included in this session.'
+                                              : 'No ERP log file uploaded.'
                                     }
                                 />
+                            </div>
+                        )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={syncModalOpen}
+                onOpenChange={(open) => !open && closeSyncModal()}
+            >
+                <DialogContent className="max-w-lg sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Sync row</DialogTitle>
+                        <DialogDescription asChild>
+                            <div className="space-y-1 text-sm text-muted-foreground">
+                                {syncModalRow && (
+                                    <>
+                                        <p>
+                                            <span className="font-medium text-foreground">
+                                                {syncModalRow.icode}
+                                            </span>{' '}
+                                            · {syncModalRow.site_code} · batch{' '}
+                                            {syncModalRow.batch_no || '—'} ·
+                                            spref {syncModalRow.sprefcode}
+                                        </p>
+                                        <p className="text-xs">
+                                            Fetch latest stock qty for this key
+                                            only from live connections.
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {syncModalLoading && (
+                        <div className="flex flex-col items-center justify-center gap-3 py-10 text-muted-foreground">
+                            <Loader2 className="size-6 animate-spin" />
+                            <p className="text-sm">
+                                Queued on external-query… fetching Zwing / ERP…
+                            </p>
+                        </div>
+                    )}
+
+                    {syncModalError && (
+                        <p className="py-6 text-center text-sm text-destructive">
+                            {syncModalError}
+                        </p>
+                    )}
+
+                    {!syncModalLoading &&
+                        !syncModalError &&
+                        syncModalResult && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="rounded-lg border px-3 py-3">
+                                        <p className="text-xs text-muted-foreground">
+                                            Zwing connection
+                                        </p>
+                                        <p className="mt-1 text-sm font-medium tabular-nums">
+                                            {formatLogQueryDuration(
+                                                syncModalResult.zwing_query_ms,
+                                            ) ??
+                                                (session.zwing_file_name
+                                                    ? '—'
+                                                    : 'Not included')}
+                                        </p>
+                                        {syncModalResult.zwing_query_ms !==
+                                            null && (
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                Query time
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="rounded-lg border px-3 py-3">
+                                        <p className="text-xs text-muted-foreground">
+                                            ERP connection
+                                        </p>
+                                        <p className="mt-1 text-sm font-medium tabular-nums">
+                                            {formatLogQueryDuration(
+                                                syncModalResult.erp_query_ms,
+                                            ) ??
+                                                (session.erp_file_name
+                                                    ? '—'
+                                                    : 'Not included')}
+                                        </p>
+                                        {syncModalResult.erp_query_ms !==
+                                            null && (
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                Query time
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {syncModalResult.removed ? (
+                                    <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm">
+                                        No stock found on either side. Row
+                                        removed from this session.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3 rounded-lg border px-3 py-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="text-sm font-medium">
+                                                Stock qty
+                                            </p>
+                                            {syncModalResult.match_status && (
+                                                <Badge
+                                                    variant={
+                                                        statusConfig[
+                                                            syncModalResult
+                                                                .match_status
+                                                        ].variant
+                                                    }
+                                                    className="text-xs"
+                                                >
+                                                    {
+                                                        statusConfig[
+                                                            syncModalResult
+                                                                .match_status
+                                                        ].label
+                                                    }
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Zwing
+                                                </p>
+                                                <p className="mt-1 tabular-nums">
+                                                    <span className="text-muted-foreground">
+                                                        {syncModalBefore?.zwing_qty?.toLocaleString() ??
+                                                            '—'}
+                                                    </span>
+                                                    <span className="mx-1.5 text-muted-foreground">
+                                                        →
+                                                    </span>
+                                                    <span className="font-medium">
+                                                        {syncModalResult.zwing_qty?.toLocaleString() ??
+                                                            '—'}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    ERP
+                                                </p>
+                                                <p className="mt-1 tabular-nums">
+                                                    <span className="text-muted-foreground">
+                                                        {syncModalBefore?.erp_qty?.toLocaleString() ??
+                                                            '—'}
+                                                    </span>
+                                                    <span className="mx-1.5 text-muted-foreground">
+                                                        →
+                                                    </span>
+                                                    <span className="font-medium">
+                                                        {syncModalResult.erp_qty?.toLocaleString() ??
+                                                            '—'}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                 </DialogContent>

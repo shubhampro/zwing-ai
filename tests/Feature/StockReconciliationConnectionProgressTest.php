@@ -1,15 +1,17 @@
 <?php
 
 use App\Jobs\PullStockReconciliationFromConnections;
+use App\Models\ExternalQueryLog;
 use App\Models\Organization;
 use App\Models\StockReconSession;
 use App\Models\User;
 use App\Services\OrganizationDatabaseConnector;
+use App\Support\ExternalQueryQueue;
 use App\Support\StockReconciliationConnectionQueries;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 
-it('dispatches connection pull on dedicated queue', function () {
+it('dispatches connection pull on external-query queue with log', function () {
     Queue::fake();
 
     $user = User::factory()->create();
@@ -26,9 +28,12 @@ it('dispatches connection pull on dedicated queue', function () {
         ->assertRedirect();
 
     Queue::assertPushedOn(
-        StockReconSession::CONNECTION_QUEUE,
+        ExternalQueryQueue::NAME,
         PullStockReconciliationFromConnections::class,
     );
+
+    expect(ExternalQueryLog::query()->count())->toBe(1)
+        ->and(ExternalQueryLog::query()->first()?->job_type->value)->toBe('pull_stock');
 });
 
 it('records query duration and row count after connection pull', function () {
@@ -78,7 +83,7 @@ it('records query duration and row count after connection pull', function () {
         includeErp: false,
     );
 
-    expect($job->queue)->toBe(StockReconSession::CONNECTION_QUEUE);
+    expect($job->queue)->toBe(ExternalQueryQueue::NAME);
 
     $job->handle($connector);
 

@@ -1,6 +1,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Database, Pencil, Plus, Trash2, Unplug } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
     destroy as destroyDatabaseConnection,
     store as storeDatabaseConnection,
@@ -11,6 +12,7 @@ import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { resolveExternalQueryResponse, xsrfToken } from '@/lib/external-query';
 import {
     Dialog,
     DialogContent,
@@ -365,7 +367,7 @@ export default function OrganizationDatabaseConnections({
     const [testingConnectionId, setTestingConnectionId] = useState<
         number | null
     >(null);
-    const { post: postTest, processing: testing } = useForm({});
+    const testing = testingConnectionId !== null;
 
     const usedTypes = databaseConnections.map((connection) => connection.type);
     const canAdd = databaseConnectionTypes.some(
@@ -387,18 +389,57 @@ export default function OrganizationDatabaseConnections({
         setDeleteDialogOpen(true);
     }
 
-    function runTest(connection: DatabaseConnection) {
+    async function runTest(connection: DatabaseConnection) {
         setTestingConnectionId(connection.id);
-        postTest(
-            testDatabaseConnection.url({
-                organization: organization.id,
-                organizationDatabaseConnection: connection.id,
-            }),
-            {
-                preserveScroll: true,
-                onFinish: () => setTestingConnectionId(null),
-            },
-        );
+
+        try {
+            const response = await fetch(
+                testDatabaseConnection.url({
+                    organization: organization.id,
+                    organizationDatabaseConnection: connection.id,
+                }),
+                {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-XSRF-TOKEN': xsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                },
+            );
+
+            if (!response.ok && response.status !== 202) {
+                throw new Error(`Connection test failed (${response.status})`);
+            }
+
+            const settled = await resolveExternalQueryResponse(response);
+            const result = settled.result as {
+                ok?: boolean;
+                message?: string;
+                latency_ms?: number | null;
+            };
+
+            const latency =
+                typeof result.latency_ms === 'number'
+                    ? ` (${result.latency_ms} ms)`
+                    : '';
+            const message = `${result.message ?? 'Connection test finished.'}${latency}`;
+
+            if (result.ok) {
+                toast.success(message);
+            } else {
+                toast.error(message);
+            }
+        } catch (error) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : 'Connection test failed.',
+            );
+        } finally {
+            setTestingConnectionId(null);
+        }
     }
 
     return (

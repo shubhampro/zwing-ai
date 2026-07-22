@@ -11,3 +11,5 @@ Artisan::command('inspire', function () {
 Schedule::command('server-health:check')
     ->everyFiveMinutes()
     ->withoutOverlapping();
+
+Schedule::command('horizon:snapshot')->everyFiveMinutes();
