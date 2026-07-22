@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\DatabaseConnectionType;
 use App\Services\SshTunnelManager;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -79,4 +80,65 @@ test('ensureMysqlOpen throws when tunnel not configured and port closed', functi
 
     expect(fn () => SshTunnelManager::ensureMysqlOpen())
         ->toThrow(RuntimeException::class, 'not configured');
+});
+
+test('localPortFor reuses base port for default remote endpoint', function () {
+    Config::set('database.connections.pgsql_ssh.tunnel', [
+        'local_port' => 5433,
+        'remote_db_host' => '127.0.0.1',
+        'remote_db_port' => 5432,
+    ]);
+
+    expect(SshTunnelManager::localPortFor(
+        DatabaseConnectionType::Pgsql,
+        '127.0.0.1',
+        5432,
+    ))->toBe(5433);
+});
+
+test('localPortFor assigns distinct ports for different remote hosts', function () {
+    Config::set('database.connections.pgsql_ssh.tunnel', [
+        'local_port' => 5433,
+        'remote_db_host' => '127.0.0.1',
+        'remote_db_port' => 5432,
+    ]);
+
+    $portA = SshTunnelManager::localPortFor(
+        DatabaseConnectionType::Pgsql,
+        'pgflex-a.postgres.database.azure.com',
+        5432,
+    );
+    $portB = SshTunnelManager::localPortFor(
+        DatabaseConnectionType::Pgsql,
+        'pgflex-b.postgres.database.azure.com',
+        5432,
+    );
+
+    expect($portA)->not->toBe(5433)
+        ->and($portB)->not->toBe(5433)
+        ->and($portA)->not->toBe($portB)
+        ->and($portA)->toBeGreaterThanOrEqual(20000)
+        ->and($portA)->toBeLessThan(30000);
+});
+
+test('ensureForRemote returns local port when fake', function () {
+    SshTunnelManager::$fake = true;
+
+    Config::set('database.connections.pgsql_ssh.tunnel', [
+        'local_port' => 5433,
+        'remote_db_host' => '127.0.0.1',
+        'remote_db_port' => 5432,
+    ]);
+
+    $port = SshTunnelManager::ensureForRemote(
+        DatabaseConnectionType::Pgsql,
+        'pgflex-erpdb-prod-02.postgres.database.azure.com',
+        5432,
+    );
+
+    expect($port)->toBe(SshTunnelManager::localPortFor(
+        DatabaseConnectionType::Pgsql,
+        'pgflex-erpdb-prod-02.postgres.database.azure.com',
+        5432,
+    ));
 });

@@ -1,12 +1,15 @@
 <?php
 
+use App\Enums\Role;
 use App\Http\Controllers\Auth\InviteRegistrationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseCashReconciliationController;
+use App\Http\Controllers\ExternalQueryLogController;
 use App\Http\Controllers\InboundEventsRunnerController;
 use App\Http\Controllers\InviteController;
 use App\Http\Controllers\InvoiceReconciliationController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OrganizationDatabaseConnectionController;
 use App\Http\Controllers\OrganizationThirdPartyApiController;
 use App\Http\Controllers\OutboundSyncController;
 use App\Http\Controllers\RoleController;
@@ -100,6 +103,27 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
         ->middleware('permission:'.Permissions::OrganizationsUpdate)
         ->name('organizations.api-connections.destroy');
 
+    Route::middleware('role:'.Role::Admin->value)->group(function () {
+        Route::get('organizations/{organization}/database-connections', [OrganizationDatabaseConnectionController::class, 'index'])
+            ->name('organizations.database-connections.index');
+        Route::post('organizations/{organization}/database-connections', [OrganizationDatabaseConnectionController::class, 'store'])
+            ->name('organizations.database-connections.store');
+        Route::put('organizations/{organization}/database-connections/{organizationDatabaseConnection}', [OrganizationDatabaseConnectionController::class, 'update'])
+            ->name('organizations.database-connections.update');
+        Route::post('organizations/{organization}/database-connections/{organizationDatabaseConnection}/test', [OrganizationDatabaseConnectionController::class, 'test'])
+            ->name('organizations.database-connections.test');
+        Route::delete('organizations/{organization}/database-connections/{organizationDatabaseConnection}', [OrganizationDatabaseConnectionController::class, 'destroy'])
+            ->name('organizations.database-connections.destroy');
+
+        Route::get('external-query-logs', [ExternalQueryLogController::class, 'index'])
+            ->name('external-query-logs.index');
+
+        Route::get('server-health', [ServerHealthController::class, 'index'])
+            ->name('server-health.index');
+        Route::post('server-health/refresh', [ServerHealthController::class, 'refresh'])
+            ->name('server-health.refresh');
+    });
+
     Route::get('third-party-apis', [ThirdPartyApiController::class, 'index'])
         ->middleware('permission:'.Permissions::ThirdPartyApisView)
         ->name('third-party-apis.index');
@@ -162,6 +186,12 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::get('stock-transaction-reconciliation/create', [StockTransactionReconciliationController::class, 'create'])
         ->middleware('permission:'.Permissions::StockReconManage)
         ->name('stock-transaction-reconciliation.create');
+    Route::get('stock-transaction-reconciliation/create-from-connections', [StockTransactionReconciliationController::class, 'createFromConnections'])
+        ->middleware('permission:'.Permissions::StockReconManage)
+        ->name('stock-transaction-reconciliation.create-from-connections');
+    Route::post('stock-transaction-reconciliation/connections', [StockTransactionReconciliationController::class, 'storeFromConnections'])
+        ->middleware('permission:'.Permissions::StockReconManage)
+        ->name('stock-transaction-reconciliation.connections');
     Route::post('stock-transaction-reconciliation/csv', [StockTransactionReconciliationController::class, 'uploadCsv'])
         ->middleware('permission:'.Permissions::StockReconManage)
         ->name('stock-transaction-reconciliation.csv');
@@ -177,6 +207,11 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::get('stock-transaction-reconciliation/{stockReconSession}/report/log-details', [StockTransactionReconciliationController::class, 'reportLogDetails'])
         ->middleware('permission:'.Permissions::StockReconView)
         ->name('stock-transaction-reconciliation.report.log-details');
+    Route::post('stock-transaction-reconciliation/{stockReconSession}/report/sync-row', [StockTransactionReconciliationController::class, 'syncReportRow'])
+        ->middleware('permission:'.Permissions::StockReconManage)
+        ->name('stock-transaction-reconciliation.report.sync-row');
+    Route::get('external-query-logs/{externalQueryLog}', [ExternalQueryLogController::class, 'show'])
+        ->name('external-query-logs.show');
     Route::get('stock-transaction-reconciliation/{stockReconSession}/zwing-logs', [StockTransactionReconciliationController::class, 'zwingLogs'])
         ->middleware('permission:'.Permissions::StockReconView)
         ->name('stock-transaction-reconciliation.zwing-logs');
@@ -257,13 +292,6 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::post('outbound-sync/fetch', [OutboundSyncController::class, 'fetch'])
         ->middleware('permission:'.Permissions::OutboundSyncManage)
         ->name('outbound-sync.fetch');
-
-    Route::middleware('permission:'.Permissions::ServerHealthView)->group(function () {
-        Route::get('server-health', [ServerHealthController::class, 'index'])->name('server-health.index');
-    });
-    Route::post('server-health/refresh', [ServerHealthController::class, 'refresh'])
-        ->middleware('permission:'.Permissions::ServerHealthManage)
-        ->name('server-health.refresh');
 
     Route::get('sql-queries', [SqlQueryController::class, 'index'])
         ->middleware('permission:'.Permissions::SqlQueriesView)

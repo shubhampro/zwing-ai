@@ -25,6 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { resolveExternalQueryResponse } from '@/lib/external-query';
 import { dashboard } from '@/routes';
 import { index } from '@/routes/transaction-checker';
 
@@ -127,9 +128,22 @@ export default function TransactionCheckerIndex({
         fetch(databasesAction.url({ query: { org_id: data.org_id } }), {
             headers: { Accept: 'application/json' },
         })
-            .then((res) => res.json())
-            .then((json: { databases: string[] }) => {
-                setAvailableDatabases(json.databases ?? []);
+            .then(async (res) => {
+                if (!res.ok && res.status !== 202) {
+                    throw new Error(`Failed to load databases (${res.status})`);
+                }
+
+                const settled = await resolveExternalQueryResponse(res);
+                const databases = settled.result?.databases;
+
+                setAvailableDatabases(
+                    Array.isArray(databases)
+                        ? databases.filter(
+                              (name): name is string =>
+                                  typeof name === 'string',
+                          )
+                        : [],
+                );
             })
             .catch((err: unknown) => {
                 setDbError(
@@ -169,14 +183,14 @@ export default function TransactionCheckerIndex({
                 body: JSON.stringify(data),
             });
 
-            if (!res.ok) {
+            if (!res.ok && res.status !== 202) {
                 const json = await res.json().catch(() => ({}));
                 setRunError(json?.message ?? `Request failed (${res.status})`);
                 return;
             }
 
-            const json: CheckResult = await res.json();
-            setResult(json);
+            const settled = await resolveExternalQueryResponse(res);
+            setResult(settled.result as CheckResult);
         } catch (err) {
             setRunError(err instanceof Error ? err.message : 'Unknown error');
         } finally {

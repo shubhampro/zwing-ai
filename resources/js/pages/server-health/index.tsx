@@ -1,9 +1,11 @@
 import { Head, router } from '@inertiajs/react';
 import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { resolveExternalQueryResponse, xsrfToken } from '@/lib/external-query';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { index, refresh } from '@/routes/server-health';
@@ -85,16 +87,46 @@ export default function ServerHealthIndex({
     const [refreshing, setRefreshing] = useState(false);
     const refreshDisabled = !can_refresh || locked || cache_fresh || refreshing;
 
-    function runRefresh() {
+    async function runRefresh() {
         setRefreshing(true);
-        router.post(
-            refresh.url(),
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => setRefreshing(false),
-            },
-        );
+
+        try {
+            const response = await fetch(refresh.url(), {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-XSRF-TOKEN': xsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+
+            if (response.status === 409) {
+                const json = (await response.json().catch(() => ({}))) as {
+                    message?: string;
+                };
+                toast.error(json.message ?? 'Health check unavailable.');
+                return;
+            }
+
+            if (!response.ok && response.status !== 202) {
+                throw new Error(`Health check failed (${response.status})`);
+            }
+
+            const settled = await resolveExternalQueryResponse(response);
+            const overall =
+                typeof settled.result?.overall_status === 'string'
+                    ? settled.result.overall_status
+                    : 'unknown';
+            toast.success(`DB health check completed: ${overall}`);
+            router.reload({ preserveScroll: true });
+        } catch (error) {
+            toast.error(
+                error instanceof Error ? error.message : 'Health check failed.',
+            );
+        } finally {
+            setRefreshing(false);
+        }
     }
 
     return (

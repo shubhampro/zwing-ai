@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 class ZwingVendorService
 {
     /**
-     * @return list<array{id: int, name: string, ba_code: string, db_name: string}>
+     * @return list<array{id: int, name: string, ba_code: string}>
      */
     public function list(): array
     {
@@ -17,12 +17,11 @@ class ZwingVendorService
             ->table('vendor')
             ->where('deleted', 0)
             ->orderBy('name')
-            ->get(['id', 'name', 'client_id', 'db_name'])
+            ->get(['id', 'name', 'client_id'])
             ->map(fn (object $row): array => [
                 'id' => (int) $row->id,
                 'name' => (string) $row->name,
                 'ba_code' => (string) ($row->client_id ?? ''),
-                'db_name' => (string) ($row->db_name ?? ''),
             ])
             ->values()
             ->all();

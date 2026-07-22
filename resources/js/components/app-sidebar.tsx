@@ -7,6 +7,7 @@ import {
     CloudUpload,
     Database,
     FileText,
+    Gauge,
     KeyRound,
     LayoutGrid,
     Mail,
@@ -23,6 +24,7 @@ import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
+import { QueueStatusWidget } from '@/components/queue-status';
 import {
     Sidebar,
     SidebarContent,
@@ -34,6 +36,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as expenseCashReconciliationIndex } from '@/routes/expense-cash-reconciliation';
+import { index as externalQueryLogsIndex } from '@/routes/external-query-logs';
 import { index as inboundEventsRunnerIndex } from '@/routes/inbound-events-runner';
 import { index as invitesIndex } from '@/routes/invites';
 import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconciliation';
@@ -149,11 +152,31 @@ const mainNavItems: NavItem[] = [
                 icon: CloudUpload,
                 permission: 'outbound-sync.view',
             },
+        ],
+    },
+    {
+        title: 'Monitoring',
+        icon: Gauge,
+        role: 'admin',
+        items: [
             {
                 title: 'DB Health',
                 href: serverHealthIndex.url(),
                 icon: Activity,
-                permission: 'server-health.view',
+                role: 'admin',
+            },
+            {
+                title: 'Sync logs',
+                href: externalQueryLogsIndex.url(),
+                icon: Database,
+                role: 'admin',
+            },
+            {
+                title: 'Horizon',
+                href: '/horizon',
+                icon: Gauge,
+                role: 'admin',
+                external: true,
             },
         ],
     },
@@ -167,10 +190,22 @@ const mainNavItems: NavItem[] = [
 
 const footerNavItems: NavItem[] = [];
 
-function filterNavItems(items: NavItem[], permissions: string[]): NavItem[] {
+function filterNavItems(
+    items: NavItem[],
+    permissions: string[],
+    roles: string[],
+): NavItem[] {
     return items.flatMap((item) => {
         if (item.items?.length) {
-            const children = filterNavItems(item.items, permissions);
+            if (item.role && !roles.includes(item.role)) {
+                return [];
+            }
+
+            if (item.permission && !permissions.includes(item.permission)) {
+                return [];
+            }
+
+            const children = filterNavItems(item.items, permissions, roles);
 
             if (children.length === 0) {
                 return [];
@@ -183,16 +218,21 @@ function filterNavItems(items: NavItem[], permissions: string[]): NavItem[] {
             return [];
         }
 
+        if (item.role && !roles.includes(item.role)) {
+            return [];
+        }
+
         return [item];
     });
 }
 
 export function AppSidebar() {
     const permissions = usePage().props.auth?.permissions ?? [];
+    const roles = usePage().props.auth?.roles ?? [];
 
     const visibleNavItems = useMemo(
-        () => filterNavItems(mainNavItems, permissions),
-        [permissions],
+        () => filterNavItems(mainNavItems, permissions, roles),
+        [permissions, roles],
     );
 
     return (
@@ -215,6 +255,7 @@ export function AppSidebar() {
 
             <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />
+                <QueueStatusWidget />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

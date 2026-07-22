@@ -28,6 +28,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useCan } from '@/hooks/use-can';
+import { resolveExternalQueryResponse, xsrfToken } from '@/lib/external-query';
+import { toast } from 'sonner';
 import { dashboard } from '@/routes';
 import { create, edit, index, show } from '@/routes/organizations';
 
@@ -44,7 +46,6 @@ type ZwingVendor = {
     id: number;
     name: string;
     ba_code: string;
-    db_name: string;
 };
 
 function DeleteDialog({
@@ -121,14 +122,20 @@ function AttachZwingVendorDialog({
             headers: { Accept: 'application/json' },
         })
             .then(async (res) => {
-                if (!res.ok) {
+                if (!res.ok && res.status !== 202) {
                     throw new Error(`Failed to load vendors (${res.status})`);
                 }
 
-                return res.json() as Promise<{
-                    vendors: ZwingVendor[];
-                    attached_vendor_ids: number[];
-                }>;
+                const settled = await resolveExternalQueryResponse(res);
+                const result = settled.result as {
+                    vendors?: ZwingVendor[];
+                    attached_vendor_ids?: number[];
+                };
+
+                return {
+                    vendors: result.vendors ?? [],
+                    attached_vendor_ids: result.attached_vendor_ids ?? [],
+                };
             })
             .then((json) => {
                 if (cancelled) {
@@ -171,34 +178,63 @@ function AttachZwingVendorDialog({
     );
 
     const syncVendor = useCallback(
-        (vendor: ZwingVendor) => {
+        async (vendor: ZwingVendor) => {
             setVendorError(undefined);
             setAttachingId(vendor.id);
             setProcessing(true);
 
-            router.post(
-                mode === 'attach'
-                    ? attachZwingVendor.url()
-                    : updateFromZwingVendor.url(),
-                { vendor_id: vendor.id },
-                {
-                    preserveScroll: true,
-                    onSuccess: () => onOpenChange(false),
-                    onError: (errors) => {
-                        setVendorError(
-                            typeof errors.vendor_id === 'string'
-                                ? errors.vendor_id
-                                : mode === 'attach'
-                                  ? 'Failed to attach vendor.'
-                                  : 'Failed to update organization.',
-                        );
+            try {
+                const response = await fetch(
+                    mode === 'attach'
+                        ? attachZwingVendor.url()
+                        : updateFromZwingVendor.url(),
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json',
+                            'X-XSRF-TOKEN': xsrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ vendor_id: vendor.id }),
                     },
-                    onFinish: () => {
-                        setProcessing(false);
-                        setAttachingId(null);
-                    },
-                },
-            );
+                );
+
+                if (!response.ok && response.status !== 202) {
+                    const json = (await response.json().catch(() => ({}))) as {
+                        message?: string;
+                        errors?: { vendor_id?: string };
+                    };
+                    throw new Error(
+                        json.errors?.vendor_id ??
+                            json.message ??
+                            (mode === 'attach'
+                                ? 'Failed to attach vendor.'
+                                : 'Failed to update organization.'),
+                    );
+                }
+
+                await resolveExternalQueryResponse(response);
+                toast.success(
+                    mode === 'attach'
+                        ? 'Organization attached from Zwing Master.'
+                        : 'Organization updated from Zwing Master.',
+                );
+                onOpenChange(false);
+                router.reload({ only: ['organizations'] });
+            } catch (error) {
+                setVendorError(
+                    error instanceof Error
+                        ? error.message
+                        : mode === 'attach'
+                          ? 'Failed to attach vendor.'
+                          : 'Failed to update organization.',
+                );
+            } finally {
+                setProcessing(false);
+                setAttachingId(null);
+            }
         },
         [mode, onOpenChange],
     );
@@ -229,16 +265,6 @@ function AttachZwingVendorDialog({
                 accessorKey: 'ba_code',
                 cell: ({ value }) => (
                     <span className="font-mono text-xs">{String(value)}</span>
-                ),
-            },
-            {
-                id: 'db_name',
-                header: 'DB Name',
-                accessorKey: 'db_name',
-                cell: ({ value }) => (
-                    <span className="font-mono text-xs text-muted-foreground">
-                        {(value as string) || '—'}
-                    </span>
                 ),
             },
             {

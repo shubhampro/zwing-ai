@@ -7,6 +7,7 @@ use App\Support\Sprefcode;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use League\Csv\Reader;
 use Throwable;
 
@@ -66,8 +67,13 @@ class ParseStockReconciliationCsv implements ShouldQueue
 
     public function failed(Throwable $exception): void
     {
+        $message = preg_replace('/Database:\s*[^,]*/i', 'Database: [hidden]', $exception->getMessage()) ?? $exception->getMessage();
+
         StockReconSession::where('id', $this->sessionId)
-            ->update(['status' => 'failed']);
+            ->update([
+                'status' => 'failed',
+                'failure_reason' => Str::limit($message, 2000),
+            ]);
     }
 
     /**

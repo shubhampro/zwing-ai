@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ExternalQueryJobType;
+use App\Enums\Role;
 use App\Http\Requests\RefreshServerHealthRequest;
 use App\Models\DbHealthCheck;
 use App\Services\DbHealth\DbHealthChecker;
-use App\Support\Permissions;
-use Illuminate\Http\RedirectResponse;
+use App\Services\ExternalQueryDispatcher;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -15,7 +17,7 @@ class ServerHealthController extends Controller
 {
     public function index(Request $request, DbHealthChecker $checker): Response
     {
-        abort_unless($request->user()?->can(Permissions::ServerHealthView), 403);
+        abort_unless($request->user()?->hasRole(Role::Admin), 403);
 
         $snapshot = $checker->snapshot();
         $ttl = (int) config('server_health.cache_ttl_seconds');
@@ -42,22 +44,39 @@ class ServerHealthController extends Controller
             'cache_ttl_seconds' => $ttl,
             'cache_fresh' => $cacheFresh,
             'locked' => $locked,
-            'can_refresh' => $request->user()?->can(Permissions::ServerHealthManage) ?? false,
+            'can_refresh' => $request->user()?->hasRole(Role::Admin) ?? false,
         ]);
     }
 
-    public function refresh(RefreshServerHealthRequest $request, DbHealthChecker $checker): RedirectResponse
-    {
+    public function refresh(
+        RefreshServerHealthRequest $request,
+        DbHealthChecker $checker,
+        ExternalQueryDispatcher $dispatcher,
+    ): JsonResponse {
         if ($checker->snapshot() !== null) {
-            return back()->with('info', 'Cached snapshot still fresh. Wait for TTL before refreshing.');
+            return response()->json([
+                'message' => 'Cached snapshot still fresh. Wait for TTL before refreshing.',
+            ], 409);
         }
 
-        $result = $checker->run();
+        $probeLock = cache()->lock(
+            config('server_health.lock_key'),
+            1,
+        );
 
-        if ($result === null) {
-            return back()->with('error', 'A health check is already running. Try again shortly.');
+        if (! $probeLock->get()) {
+            return response()->json([
+                'message' => 'A health check is already running. Try again shortly.',
+            ], 409);
         }
 
-        return back()->with('success', 'DB health check completed: '.$result['overall_status']);
+        $probeLock->release();
+
+        $log = $dispatcher->dispatch(
+            jobType: ExternalQueryJobType::ServerHealthCheck,
+            user: $request->user(),
+        );
+
+        return response()->json($log->toPollPayload(), 202);
     }
 }

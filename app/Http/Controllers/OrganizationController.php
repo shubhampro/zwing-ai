@@ -2,18 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ExternalQueryJobType;
 use App\Http\Requests\AttachZwingVendorRequest;
 use App\Http\Requests\StoreOrganizationRequest;
 use App\Http\Requests\UpdateFromZwingVendorRequest;
 use App\Http\Requests\UpdateOrganizationRequest;
 use App\Models\Organization;
+use App\Models\OrganizationDatabaseConnection;
 use App\Models\OrganizationThirdPartyApi;
 use App\Models\ThirdPartyApi;
-use App\Services\ZwingVendorService;
+use App\Services\ExternalQueryDispatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -33,98 +34,46 @@ class OrganizationController extends Controller
         ]);
     }
 
-    public function zwingVendors(Request $request, ZwingVendorService $zwingVendors): JsonResponse
+    public function zwingVendors(Request $request, ExternalQueryDispatcher $dispatcher): JsonResponse
     {
         $this->authorize('attachZwing', Organization::class);
 
-        $attachedVendorIds = Organization::query()
-            ->pluck('vendor_id')
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
+        $log = $dispatcher->dispatch(
+            jobType: ExternalQueryJobType::ListZwingVendors,
+            user: $request->user(),
+        );
 
-        return response()->json([
-            'vendors' => $zwingVendors->list(),
-            'attached_vendor_ids' => $attachedVendorIds,
-        ]);
+        return response()->json($log->toPollPayload(), 202);
     }
 
     public function attachZwingVendor(
         AttachZwingVendorRequest $request,
-        ZwingVendorService $zwingVendors,
-    ): RedirectResponse {
-        $vendorId = $request->integer('vendor_id');
-        $vendor = $zwingVendors->find($vendorId);
+        ExternalQueryDispatcher $dispatcher,
+    ): JsonResponse {
+        $log = $dispatcher->dispatch(
+            jobType: ExternalQueryJobType::AttachZwingVendor,
+            user: $request->user(),
+            context: [
+                'vendor_id' => $request->integer('vendor_id'),
+            ],
+        );
 
-        if ($vendor === null) {
-            throw ValidationException::withMessages([
-                'vendor_id' => __('Vendor not found in Zwing Master.'),
-            ]);
-        }
-
-        if (Organization::query()->where('ba_code', $vendor['ba_code'])->exists()) {
-            throw ValidationException::withMessages([
-                'vendor_id' => __('An organization with BA code :code already exists.', [
-                    'code' => $vendor['ba_code'],
-                ]),
-            ]);
-        }
-
-        Organization::create([
-            'name' => $vendor['name'],
-            'ba_code' => $vendor['ba_code'],
-            'vendor_id' => $vendor['id'],
-            'db_name' => $vendor['db_name'] !== '' ? $vendor['db_name'] : null,
-        ]);
-
-        Inertia::flash('toast', [
-            'type' => 'success',
-            'message' => __('Organization attached from Zwing Master successfully.'),
-        ]);
-
-        return redirect()->route('organizations.index');
+        return response()->json($log->toPollPayload(), 202);
     }
 
     public function updateFromZwingVendor(
         UpdateFromZwingVendorRequest $request,
-        ZwingVendorService $zwingVendors,
-    ): RedirectResponse {
-        $vendorId = $request->integer('vendor_id');
-        $vendor = $zwingVendors->find($vendorId);
+        ExternalQueryDispatcher $dispatcher,
+    ): JsonResponse {
+        $log = $dispatcher->dispatch(
+            jobType: ExternalQueryJobType::UpdateFromZwingVendor,
+            user: $request->user(),
+            context: [
+                'vendor_id' => $request->integer('vendor_id'),
+            ],
+        );
 
-        if ($vendor === null) {
-            throw ValidationException::withMessages([
-                'vendor_id' => __('Vendor not found in Zwing Master.'),
-            ]);
-        }
-
-        $organization = Organization::query()
-            ->where('vendor_id', $vendorId)
-            ->firstOrFail();
-
-        if (Organization::query()
-            ->where('ba_code', $vendor['ba_code'])
-            ->where('id', '!=', $organization->id)
-            ->exists()) {
-            throw ValidationException::withMessages([
-                'vendor_id' => __('An organization with BA code :code already exists.', [
-                    'code' => $vendor['ba_code'],
-                ]),
-            ]);
-        }
-
-        $organization->update([
-            'name' => $vendor['name'],
-            'ba_code' => $vendor['ba_code'],
-            'db_name' => $vendor['db_name'] !== '' ? $vendor['db_name'] : null,
-        ]);
-
-        Inertia::flash('toast', [
-            'type' => 'success',
-            'message' => __('Organization updated from Zwing Master successfully.'),
-        ]);
-
-        return redirect()->route('organizations.index');
+        return response()->json($log->toPollPayload(), 202);
     }
 
     public function create(Request $request): Response
@@ -174,8 +123,9 @@ class OrganizationController extends Controller
             ]);
 
         return Inertia::render('organizations/show', [
-            'organization' => $organization->only(['id', 'name', 'ba_code', 'vendor_id', 'db_name']),
+            'organization' => $organization->only(['id', 'name', 'ba_code', 'vendor_id']),
             'apiApps' => $apiApps,
+            'canManageDatabaseConnections' => $request->user()?->can('viewAny', OrganizationDatabaseConnection::class) ?? false,
         ]);
     }
 
@@ -184,7 +134,7 @@ class OrganizationController extends Controller
         $this->authorize('update', $organization);
 
         return Inertia::render('organizations/edit', [
-            'organization' => $organization->only(['id', 'name', 'ba_code', 'vendor_id', 'db_name']),
+            'organization' => $organization->only(['id', 'name', 'ba_code', 'vendor_id']),
         ]);
     }
 
