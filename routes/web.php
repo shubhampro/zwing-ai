@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Role;
 use App\Http\Controllers\Auth\InviteRegistrationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseCashReconciliationController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\InboundEventsRunnerController;
 use App\Http\Controllers\InviteController;
 use App\Http\Controllers\InvoiceReconciliationController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OrganizationDatabaseConnectionController;
 use App\Http\Controllers\OrganizationThirdPartyApiController;
 use App\Http\Controllers\OutboundSyncController;
 use App\Http\Controllers\RoleController;
@@ -100,6 +102,19 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
         ->middleware('permission:'.Permissions::OrganizationsUpdate)
         ->name('organizations.api-connections.destroy');
 
+    Route::middleware('role:'.Role::Admin->value)->group(function () {
+        Route::get('organizations/{organization}/database-connections', [OrganizationDatabaseConnectionController::class, 'index'])
+            ->name('organizations.database-connections.index');
+        Route::post('organizations/{organization}/database-connections', [OrganizationDatabaseConnectionController::class, 'store'])
+            ->name('organizations.database-connections.store');
+        Route::put('organizations/{organization}/database-connections/{organizationDatabaseConnection}', [OrganizationDatabaseConnectionController::class, 'update'])
+            ->name('organizations.database-connections.update');
+        Route::post('organizations/{organization}/database-connections/{organizationDatabaseConnection}/test', [OrganizationDatabaseConnectionController::class, 'test'])
+            ->name('organizations.database-connections.test');
+        Route::delete('organizations/{organization}/database-connections/{organizationDatabaseConnection}', [OrganizationDatabaseConnectionController::class, 'destroy'])
+            ->name('organizations.database-connections.destroy');
+    });
+
     Route::get('third-party-apis', [ThirdPartyApiController::class, 'index'])
         ->middleware('permission:'.Permissions::ThirdPartyApisView)
         ->name('third-party-apis.index');
@@ -162,6 +177,12 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::get('stock-transaction-reconciliation/create', [StockTransactionReconciliationController::class, 'create'])
         ->middleware('permission:'.Permissions::StockReconManage)
         ->name('stock-transaction-reconciliation.create');
+    Route::get('stock-transaction-reconciliation/create-from-connections', [StockTransactionReconciliationController::class, 'createFromConnections'])
+        ->middleware('permission:'.Permissions::StockReconManage)
+        ->name('stock-transaction-reconciliation.create-from-connections');
+    Route::post('stock-transaction-reconciliation/connections', [StockTransactionReconciliationController::class, 'storeFromConnections'])
+        ->middleware('permission:'.Permissions::StockReconManage)
+        ->name('stock-transaction-reconciliation.connections');
     Route::post('stock-transaction-reconciliation/csv', [StockTransactionReconciliationController::class, 'uploadCsv'])
         ->middleware('permission:'.Permissions::StockReconManage)
         ->name('stock-transaction-reconciliation.csv');

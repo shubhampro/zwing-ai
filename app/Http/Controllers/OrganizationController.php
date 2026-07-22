@@ -7,6 +7,7 @@ use App\Http\Requests\StoreOrganizationRequest;
 use App\Http\Requests\UpdateFromZwingVendorRequest;
 use App\Http\Requests\UpdateOrganizationRequest;
 use App\Models\Organization;
+use App\Models\OrganizationDatabaseConnection;
 use App\Models\OrganizationThirdPartyApi;
 use App\Models\ThirdPartyApi;
 use App\Services\ZwingVendorService;
@@ -174,8 +175,9 @@ class OrganizationController extends Controller
             ]);
 
         return Inertia::render('organizations/show', [
-            'organization' => $organization->only(['id', 'name', 'ba_code', 'vendor_id', 'db_name']),
+            'organization' => $organization->only(['id', 'name', 'ba_code', 'vendor_id']),
             'apiApps' => $apiApps,
+            'canManageDatabaseConnections' => $request->user()?->can('viewAny', OrganizationDatabaseConnection::class) ?? false,
         ]);
     }
 
@@ -184,7 +186,7 @@ class OrganizationController extends Controller
         $this->authorize('update', $organization);
 
         return Inertia::render('organizations/edit', [
-            'organization' => $organization->only(['id', 'name', 'ba_code', 'vendor_id', 'db_name']),
+            'organization' => $organization->only(['id', 'name', 'ba_code', 'vendor_id']),
         ]);
     }
 

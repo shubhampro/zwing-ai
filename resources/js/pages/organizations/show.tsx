@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Eye, Pencil, Plug, Trash2 } from 'lucide-react';
+import { Database, Pencil, Plug, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     destroyForOrganization as destroyConnection,
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { dashboard } from '@/routes';
 import { edit, index, show } from '@/routes/organizations';
+import { index as databaseConnectionsIndex } from '@/routes/organizations/database-connections';
 
 type Connection = { id: number; base_url: string; is_active: boolean };
 type ApiApp = {
@@ -30,7 +31,6 @@ type Organization = {
     name: string;
     ba_code: string;
     vendor_id: number;
-    db_name: string | null;
 };
 
 function ConnectionForm({
@@ -134,9 +134,11 @@ function ConnectionForm({
 export default function OrganizationsShow({
     organization,
     apiApps,
+    canManageDatabaseConnections = false,
 }: {
     organization: Organization;
     apiApps: ApiApp[];
+    canManageDatabaseConnections?: boolean;
 }) {
     const [editingApiId, setEditingApiId] = useState<number | null>(null);
     const { delete: deleteConnection, processing } = useForm();
@@ -154,17 +156,28 @@ export default function OrganizationsShow({
                         <p className="text-sm text-muted-foreground">
                             BA {organization.ba_code} · Vendor{' '}
                             {organization.vendor_id}
-                            {organization.db_name
-                                ? ` · DB ${organization.db_name}`
-                                : ''}
                         </p>
                     </div>
-                    <Link href={edit.url(organization.id)}>
-                        <Button variant="outline" size="sm">
-                            <Pencil className="size-4" />
-                            Edit details
-                        </Button>
-                    </Link>
+                    <div className="flex gap-2">
+                        {canManageDatabaseConnections && (
+                            <Link
+                                href={databaseConnectionsIndex.url(
+                                    organization.id,
+                                )}
+                            >
+                                <Button variant="outline" size="sm">
+                                    <Database className="size-4" />
+                                    Database connections
+                                </Button>
+                            </Link>
+                        )}
+                        <Link href={edit.url(organization.id)}>
+                            <Button variant="outline" size="sm">
+                                <Pencil className="size-4" />
+                                Edit details
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
                 <section className="flex flex-col gap-4">

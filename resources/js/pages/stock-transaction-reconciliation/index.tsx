@@ -22,6 +22,7 @@ import {
 import { dashboard } from '@/routes';
 import {
     create,
+    createFromConnections,
     index,
     report,
     show,
@@ -33,6 +34,7 @@ type SessionRow = {
     id: number;
     name: string;
     v_id: number;
+    source?: string;
     zwing_file_name: string | null;
     erp_file_name: string | null;
     zwing_row_count: number | null;
@@ -131,11 +133,18 @@ export default function StockTransactionReconciliationIndex({
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <Heading
                         title="Stock–transaction reconciliation"
-                        description="Upload Zwing and ERP CSVs to reconcile stock data. Each upload creates a new session."
+                        description="Reconcile Zwing and ERP stock via CSV upload or org database connections."
                     />
-                    <Button size="sm" asChild>
-                        <Link href={create.url()}>New reconciliation</Link>
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" asChild>
+                            <Link href={createFromConnections.url()}>
+                                From connections
+                            </Link>
+                        </Button>
+                        <Button size="sm" asChild>
+                            <Link href={create.url()}>New from CSV</Link>
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
@@ -171,12 +180,19 @@ export default function StockTransactionReconciliationIndex({
                                     >
                                         No reconciliation sessions found.{' '}
                                         <Link
+                                            href={createFromConnections.url()}
+                                            className="text-foreground underline"
+                                        >
+                                            Pull from connections
+                                        </Link>{' '}
+                                        or{' '}
+                                        <Link
                                             href={create.url()}
                                             className="text-foreground underline"
                                         >
-                                            Start a new reconciliation
-                                        </Link>{' '}
-                                        by uploading Zwing and/or ERP CSV files.
+                                            upload CSV
+                                        </Link>
+                                        .
                                     </td>
                                 </tr>
                             )}

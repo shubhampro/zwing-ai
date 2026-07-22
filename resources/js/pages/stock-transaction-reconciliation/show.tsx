@@ -3,6 +3,7 @@ import {
     ArrowLeft,
     CheckCircle,
     FileText,
+    LoaderCircle,
     Trash2,
     XCircle,
 } from 'lucide-react';
@@ -29,11 +30,13 @@ import {
 } from '@/routes/stock-transaction-reconciliation';
 
 type SessionStatus = 'pending' | 'processing' | 'completed' | 'failed';
+type SessionSource = 'csv' | 'connection';
 
 type SessionData = {
     id: number;
     name: string;
     v_id: number;
+    source?: SessionSource;
     zwing_file_name: string | null;
     erp_file_name: string | null;
     zwing_log_file_name: string | null;
@@ -50,7 +53,10 @@ type SessionData = {
     erp_skipped_rows: number;
     zwing_log_skipped_rows: number;
     erp_log_skipped_rows: number;
+    zwing_query_ms: number | null;
+    erp_query_ms: number | null;
     status: SessionStatus;
+    failure_reason: string | null;
     reconciled_at: string | null;
     created_at: string;
 };
@@ -65,6 +71,27 @@ const statusVariant: Record<
     failed: 'destructive',
 };
 
+function formatDuration(ms: number | null): string | null {
+    if (ms === null) {
+        return null;
+    }
+
+    if (ms < 1000) {
+        return `${ms} ms`;
+    }
+
+    const totalSeconds = ms / 1000;
+
+    if (totalSeconds < 60) {
+        return `${totalSeconds.toFixed(totalSeconds < 10 ? 1 : 0)} s`;
+    }
+
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.round(totalSeconds % 60);
+
+    return `${minutes}m ${seconds}s`;
+}
+
 function ProgressBar({
     label,
     fileName,
@@ -72,6 +99,8 @@ function ProgressBar({
     total,
     skipped,
     status,
+    queryMs,
+    isConnection,
 }: {
     label: string;
     fileName: string | null;
@@ -79,16 +108,27 @@ function ProgressBar({
     total: number | null;
     skipped: number;
     status: SessionStatus;
+    queryMs: number | null;
+    isConnection: boolean;
 }) {
     const isActive = fileName !== null;
-    const percentage =
-        total && total > 0
-            ? Math.min(100, Math.round((processed / total) * 100))
-            : 0;
+    const knownTotal = total !== null && total > 0;
+    const percentage = knownTotal
+        ? Math.min(100, Math.round((processed / total) * 100))
+        : status === 'completed' && isActive
+          ? 100
+          : 0;
+    const isRunning =
+        isActive &&
+        (status === 'pending' || status === 'processing') &&
+        (isConnection
+            ? total === null
+            : !knownTotal || processed < (total ?? 0));
     const isDone =
         status === 'completed' ||
-        (isActive && processed >= (total ?? 0) && total !== null);
+        (isActive && knownTotal && processed >= total && !isRunning);
     const isFailed = status === 'failed';
+    const durationLabel = formatDuration(queryMs);
 
     return (
         <div className="flex flex-col gap-2 rounded-lg border border-sidebar-border/70 p-5 dark:border-sidebar-border">
@@ -107,7 +147,10 @@ function ProgressBar({
                 </div>
                 {isActive && (
                     <div className="shrink-0">
-                        {isDone && !isFailed && (
+                        {isRunning && (
+                            <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
+                        )}
+                        {isDone && !isFailed && !isRunning && (
                             <CheckCircle className="size-5 text-green-500" />
                         )}
                         {isFailed && (
@@ -120,18 +163,44 @@ function ProgressBar({
             {isActive && (
                 <>
                     <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                            className="h-full rounded-full bg-primary transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                        />
+                        {isRunning && !knownTotal ? (
+                            <div className="h-full w-1/3 animate-pulse rounded-full bg-primary/80" />
+                        ) : (
+                            <div
+                                className="h-full rounded-full bg-primary transition-all duration-500"
+                                style={{ width: `${percentage}%` }}
+                            />
+                        )}
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>
-                            {processed.toLocaleString()} /{' '}
-                            {total !== null ? total.toLocaleString() : '—'} rows
+                            {isConnection && !knownTotal
+                                ? `${processed.toLocaleString()} rows pulled`
+                                : `${processed.toLocaleString()} / ${
+                                      total !== null
+                                          ? total.toLocaleString()
+                                          : '—'
+                                  } rows`}
                         </span>
-                        <span>{percentage}%</span>
+                        <span>
+                            {isRunning && !knownTotal
+                                ? 'Loading…'
+                                : `${percentage}%`}
+                        </span>
                     </div>
+                    {durationLabel && (
+                        <p className="text-xs text-muted-foreground">
+                            Query time:{' '}
+                            <span className="font-medium text-foreground">
+                                {durationLabel}
+                            </span>
+                        </p>
+                    )}
+                    {isRunning && !durationLabel && isConnection && (
+                        <p className="text-xs text-muted-foreground">
+                            Query running…
+                        </p>
+                    )}
                     {skipped > 0 && (
                         <p className="text-xs text-amber-600 dark:text-amber-400">
                             {skipped.toLocaleString()}{' '}
@@ -158,6 +227,7 @@ export default function StockTransactionReconciliationShow({
 }) {
     const isFinished =
         session.status === 'completed' || session.status === 'failed';
+    const isConnection = (session.source ?? 'csv') === 'connection';
     const hasLogUploads =
         session.zwing_log_file_name !== null ||
         session.erp_log_file_name !== null;
@@ -197,16 +267,21 @@ export default function StockTransactionReconciliationShow({
                             </h1>
                             <p className="mt-0.5 text-xs text-muted-foreground">
                                 Vendor ID: {session.v_id}
+                                {isConnection && ' · connection pull'}
                             </p>
                             <p className="mt-1 text-sm text-muted-foreground">
                                 {session.status === 'pending' &&
-                                    'Queued — waiting for the worker to start…'}
+                                    (isConnection
+                                        ? 'Queued on stock-recon-connections — waiting for worker…'
+                                        : 'Queued — waiting for the worker to start…')}
                                 {session.status === 'processing' &&
-                                    'Inserting rows — this page refreshes automatically.'}
+                                    (isConnection
+                                        ? 'Pulling rows from connections — this page refreshes automatically.'
+                                        : 'Inserting rows — this page refreshes automatically.')}
                                 {session.status === 'completed' &&
                                     `Completed at ${new Date(session.reconciled_at!).toLocaleString()}`}
                                 {session.status === 'failed' &&
-                                    'Processing failed. Please try uploading again.'}
+                                    'Processing failed.'}
                             </p>
                         </div>
                     </div>
@@ -256,6 +331,17 @@ export default function StockTransactionReconciliationShow({
                     </div>
                 </div>
 
+                {session.status === 'failed' && session.failure_reason && (
+                    <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3">
+                        <p className="text-sm font-medium text-destructive">
+                            Failure reason
+                        </p>
+                        <pre className="mt-2 max-h-48 overflow-auto font-mono text-xs break-words whitespace-pre-wrap text-destructive/90">
+                            {session.failure_reason}
+                        </pre>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <ProgressBar
                         label="Zwing (POS)"
@@ -264,6 +350,8 @@ export default function StockTransactionReconciliationShow({
                         total={session.zwing_row_count}
                         skipped={session.zwing_skipped_rows}
                         status={session.status}
+                        queryMs={session.zwing_query_ms}
+                        isConnection={isConnection}
                     />
                     <ProgressBar
                         label="ERP"
@@ -272,6 +360,8 @@ export default function StockTransactionReconciliationShow({
                         total={session.erp_row_count}
                         skipped={session.erp_skipped_rows}
                         status={session.status}
+                        queryMs={session.erp_query_ms}
+                        isConnection={isConnection}
                     />
                 </div>
 
@@ -286,6 +376,8 @@ export default function StockTransactionReconciliationShow({
                                 total={session.zwing_log_row_count}
                                 skipped={session.zwing_log_skipped_rows}
                                 status={session.status}
+                                queryMs={null}
+                                isConnection={false}
                             />
                             <ProgressBar
                                 label="ERP logs"
@@ -294,6 +386,8 @@ export default function StockTransactionReconciliationShow({
                                 total={session.erp_log_row_count}
                                 skipped={session.erp_log_skipped_rows}
                                 status={session.status}
+                                queryMs={null}
+                                isConnection={false}
                             />
                         </div>
                     </div>

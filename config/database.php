@@ -129,6 +129,34 @@ return [
             ],
         ],
 
+        'pgsql_ssh' => [
+            'driver' => 'pgsql',
+            'host' => '127.0.0.1',
+            'port' => env('PGSQL_SSH_LOCAL_PORT', 5433),
+            'database' => env('PGSQL_SSH_DATABASE', ''),
+            'username' => env('PGSQL_SSH_USERNAME', ''),
+            'password' => env('PGSQL_SSH_PASSWORD', ''),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('PGSQL_SSH_SSLMODE', 'prefer'),
+            /*
+            | Lazy SSH tunnel: opened on demand via SshTunnelManager.
+            | PGSQL_SSH_KEY = filename under ~/.ssh (e.g. id_ed25519_work).
+            */
+            'tunnel' => [
+                'ssh_host' => env('PGSQL_SSH_HOST'),
+                'ssh_port' => env('PGSQL_SSH_PORT', 22),
+                'ssh_user' => env('PGSQL_SSH_USER'),
+                'ssh_key' => env('PGSQL_SSH_KEY'),
+                'ssh_key_dir' => env('PGSQL_SSH_KEY_DIR'),
+                'remote_db_host' => env('PGSQL_SSH_REMOTE_HOST', '127.0.0.1'),
+                'remote_db_port' => env('PGSQL_SSH_REMOTE_PORT', 5432),
+                'local_port' => env('PGSQL_SSH_LOCAL_PORT', 5433),
+            ],
+        ],
+
         'mongodb_ssh' => [
             'driver' => 'mongodb',
             'host' => '127.0.0.1',

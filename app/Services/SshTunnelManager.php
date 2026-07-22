@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\DatabaseConnectionType;
 use RuntimeException;
 
 final class SshTunnelManager
@@ -53,6 +54,145 @@ final class SshTunnelManager
             'remote_db_port' => $tunnel['remote_db_port'] ?? 3306,
             'local_port' => $localPort,
         ]);
+    }
+
+    /**
+     * Ensure the Postgres SSH tunnel from config is open (lazy).
+     */
+    public static function ensurePgsqlOpen(): void
+    {
+        if (self::$fake) {
+            return;
+        }
+
+        /** @var array<string, mixed> $tunnel */
+        $tunnel = config('database.connections.pgsql_ssh.tunnel', []);
+        $localPort = (int) ($tunnel['local_port'] ?? 5433);
+
+        if (self::isPortListening($localPort)) {
+            return;
+        }
+
+        $host = (string) ($tunnel['ssh_host'] ?? '');
+        $user = (string) ($tunnel['ssh_user'] ?? '');
+        $key = (string) ($tunnel['ssh_key'] ?? '');
+
+        if ($host === '' || $user === '' || $key === '') {
+            throw new RuntimeException(
+                'Postgres SSH tunnel is not open and PGSQL_SSH_HOST / PGSQL_SSH_USER / PGSQL_SSH_KEY are not configured.',
+            );
+        }
+
+        self::ensureOpen([
+            'ssh_host' => $host,
+            'ssh_port' => $tunnel['ssh_port'] ?? 22,
+            'ssh_user' => $user,
+            'ssh_key' => $key,
+            'ssh_key_dir' => $tunnel['ssh_key_dir'] ?? null,
+            'remote_db_host' => $tunnel['remote_db_host'] ?? '127.0.0.1',
+            'remote_db_port' => $tunnel['remote_db_port'] ?? 5432,
+            'local_port' => $localPort,
+        ]);
+    }
+
+    public static function ensureForDatabaseType(DatabaseConnectionType $type): void
+    {
+        match ($type) {
+            DatabaseConnectionType::Mysql => self::ensureMysqlOpen(),
+            DatabaseConnectionType::Pgsql => self::ensurePgsqlOpen(),
+        };
+    }
+
+    /**
+     * Open (or reuse) an SSH tunnel to a remote DB host through the shared bastion.
+     *
+     * Returns the local port Laravel should connect to on 127.0.0.1.
+     * Different remote host/port pairs get distinct local ports so tunnels do not clash.
+     */
+    public static function ensureForRemote(
+        DatabaseConnectionType $type,
+        string $remoteDbHost,
+        int $remoteDbPort,
+    ): int {
+        $remoteDbHost = trim($remoteDbHost);
+
+        if ($remoteDbHost === '') {
+            throw new RuntimeException('Remote database host is required for SSH tunnel.');
+        }
+
+        $tunnel = self::bastionTunnelConfig($type);
+        $localPort = self::localPortFor($type, $remoteDbHost, $remoteDbPort);
+
+        if (self::$fake) {
+            return $localPort;
+        }
+
+        $host = (string) ($tunnel['ssh_host'] ?? '');
+        $user = (string) ($tunnel['ssh_user'] ?? '');
+        $key = (string) ($tunnel['ssh_key'] ?? '');
+
+        if ($host === '' || $user === '' || $key === '') {
+            $prefix = $type === DatabaseConnectionType::Mysql ? 'MYSQL_SSH' : 'PGSQL_SSH';
+
+            throw new RuntimeException(
+                "{$type->value} SSH bastion is not configured. Set {$prefix}_HOST / {$prefix}_USER / {$prefix}_KEY.",
+            );
+        }
+
+        self::ensureOpen([
+            'ssh_host' => $host,
+            'ssh_port' => $tunnel['ssh_port'] ?? 22,
+            'ssh_user' => $user,
+            'ssh_key' => $key,
+            'ssh_key_dir' => $tunnel['ssh_key_dir'] ?? null,
+            'remote_db_host' => $remoteDbHost,
+            'remote_db_port' => $remoteDbPort,
+            'local_port' => $localPort,
+        ]);
+
+        return $localPort;
+    }
+
+    /**
+     * Stable local port for a type + remote DB endpoint.
+     */
+    public static function localPortFor(
+        DatabaseConnectionType $type,
+        string $remoteDbHost,
+        int $remoteDbPort,
+    ): int {
+        $tunnel = self::bastionTunnelConfig($type);
+        $basePort = (int) ($tunnel['local_port'] ?? match ($type) {
+            DatabaseConnectionType::Mysql => 3307,
+            DatabaseConnectionType::Pgsql => 5433,
+        });
+        $defaultRemoteHost = (string) ($tunnel['remote_db_host'] ?? '127.0.0.1');
+        $defaultRemotePort = (int) ($tunnel['remote_db_port'] ?? match ($type) {
+            DatabaseConnectionType::Mysql => 3306,
+            DatabaseConnectionType::Pgsql => 5432,
+        });
+
+        if ($remoteDbHost === $defaultRemoteHost && $remoteDbPort === $defaultRemotePort) {
+            return $basePort;
+        }
+
+        $hash = crc32($type->value.'|'.$remoteDbHost.'|'.$remoteDbPort);
+
+        return 20000 + ($hash % 10000);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function bastionTunnelConfig(DatabaseConnectionType $type): array
+    {
+        /** @var array<string, mixed> $tunnel */
+        $tunnel = match ($type) {
+            DatabaseConnectionType::Mysql => config('database.connections.mysql_ssh.tunnel', []),
+            DatabaseConnectionType::Pgsql => config('database.connections.pgsql_ssh.tunnel', []),
+        };
+
+        return is_array($tunnel) ? $tunnel : [];
     }
 
     /**

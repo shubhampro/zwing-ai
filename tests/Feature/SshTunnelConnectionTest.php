@@ -27,6 +27,24 @@ test('mongodb_ssh connection is registered with correct driver', function () {
         ->and($config['driver'])->toBe('mongodb');
 });
 
+test('pgsql_ssh connection is registered with tunnel settings', function () {
+    $config = Config::get('database.connections.pgsql_ssh');
+
+    expect($config)->toBeArray()
+        ->and($config['driver'])->toBe('pgsql')
+        ->and($config['host'])->toBe('127.0.0.1')
+        ->and($config)->toHaveKey('tunnel')
+        ->and($config['tunnel'])->toHaveKeys([
+            'ssh_host',
+            'ssh_port',
+            'ssh_user',
+            'ssh_key',
+            'remote_db_host',
+            'remote_db_port',
+            'local_port',
+        ]);
+});
+
 test('mysql_ssh rejects write queries', function () {
     DB::connection('mysql_ssh')->beforeExecuting(function (string $sql): void {
         $writePattern = '/^\s*(insert|update|delete|drop|truncate|alter|create|replace|rename)\b/i';

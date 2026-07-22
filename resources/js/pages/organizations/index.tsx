@@ -44,7 +44,6 @@ type ZwingVendor = {
     id: number;
     name: string;
     ba_code: string;
-    db_name: string;
 };
 
 function DeleteDialog({
@@ -229,16 +228,6 @@ function AttachZwingVendorDialog({
                 accessorKey: 'ba_code',
                 cell: ({ value }) => (
                     <span className="font-mono text-xs">{String(value)}</span>
-                ),
-            },
-            {
-                id: 'db_name',
-                header: 'DB Name',
-                accessorKey: 'db_name',
-                cell: ({ value }) => (
-                    <span className="font-mono text-xs text-muted-foreground">
-                        {(value as string) || '—'}
-                    </span>
                 ),
             },
             {

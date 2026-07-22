@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { uploadCsv } from '@/actions/App/Http/Controllers/StockTransactionReconciliationController';
 import InputError from '@/components/input-error';
@@ -7,7 +7,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { dashboard } from '@/routes';
-import { create, index } from '@/routes/stock-transaction-reconciliation';
+import {
+    create,
+    createFromConnections,
+    index,
+} from '@/routes/stock-transaction-reconciliation';
 
 const STOCK_REQUIRED_COLUMNS = [
     'site_code',
@@ -154,14 +158,21 @@ export default function StockTransactionReconciliationCreate() {
             <Head title="New reconciliation" />
 
             <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">
-                        New reconciliation
-                    </h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Upload Zwing and/or ERP stock exports. Log files are
-                        optional.
-                    </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            New reconciliation
+                        </h1>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Upload Zwing and/or ERP stock exports. Log files are
+                            optional.
+                        </p>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href={createFromConnections.url()}>
+                            Use connections instead
+                        </Link>
+                    </Button>
                 </div>
 
                 <form onSubmit={submit} className="flex flex-col gap-6">

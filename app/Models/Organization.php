@@ -25,4 +25,9 @@ class Organization extends Model
     {
         return $this->hasMany(OrganizationThirdPartyApi::class);
     }
+
+    public function databaseConnections(): HasMany
+    {
+        return $this->hasMany(OrganizationDatabaseConnection::class);
+    }
 }

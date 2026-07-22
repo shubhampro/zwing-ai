@@ -2,14 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DatabaseConnectionType;
 use App\Http\Requests\StockReconLogDetailRequest;
+use App\Http\Requests\StoreStockReconciliationConnectionRequest;
 use App\Http\Requests\StoreStockReconciliationCsvRequest;
 use App\Jobs\ParseStockReconciliationCsv;
+use App\Jobs\PullStockReconciliationFromConnections;
+use App\Models\Organization;
+use App\Models\OrganizationDatabaseConnection;
 use App\Models\StockReconErpLog;
 use App\Models\StockReconSession;
 use App\Models\StockReconZwingLog;
 use App\Models\User;
 use App\Services\StockReconLogDetailService;
+use App\Support\DatabaseHost;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,6 +38,7 @@ class StockTransactionReconciliationController extends Controller
                 'id',
                 'name',
                 'v_id',
+                'source',
                 'zwing_file_name',
                 'erp_file_name',
                 'zwing_row_count',
@@ -53,6 +60,100 @@ class StockTransactionReconciliationController extends Controller
         return Inertia::render('stock-transaction-reconciliation/create');
     }
 
+    public function createFromConnections(Request $request): Response
+    {
+        abort_if($request->user() === null, 403);
+
+        $organizations = Organization::query()
+            ->whereNotNull('db_name')
+            ->with(['databaseConnections' => fn ($query) => $query
+                ->active()
+                ->ofType(DatabaseConnectionType::Pgsql)
+                ->orderBy('type')])
+            ->orderBy('name')
+            ->get(['id', 'name', 'ba_code', 'vendor_id', 'db_name']);
+
+        $organizationPayload = $organizations
+            ->map(fn (Organization $organization) => [
+                'id' => $organization->id,
+                'name' => $organization->name,
+                'ba_code' => $organization->ba_code,
+                'vendor_id' => $organization->vendor_id,
+                'has_db_name' => filled($organization->db_name),
+                'pgsql_connections' => $organization->databaseConnections
+                    ->map(fn (OrganizationDatabaseConnection $connection) => [
+                        'id' => $connection->id,
+                        'type' => $connection->type->value,
+                        'host_masked' => DatabaseHost::mask($connection->host),
+                        'is_active' => $connection->is_active,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+
+        /** @var Organization|null $firstOrganization */
+        $firstOrganization = $organizations->first();
+
+        return Inertia::render('stock-transaction-reconciliation/create-from-connections', [
+            'organizations' => $organizationPayload,
+            // Stable SSR/client first paint — avoid Date.now()/toLocaleString hydration mismatch.
+            'suggestedSessionName' => $firstOrganization !== null
+                ? sprintf(
+                    '%s · connection stock · %s',
+                    $firstOrganization->name,
+                    now()->format('Y-m-d h:i A'),
+                )
+                : '',
+        ]);
+    }
+
+    public function storeFromConnections(StoreStockReconciliationConnectionRequest $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        /** @var Organization $organization */
+        $organization = Organization::query()->findOrFail($request->integer('organization_id'));
+
+        $includeZwing = $request->boolean('include_zwing');
+        $includeErp = $request->boolean('include_erp');
+        $pgsqlConnectionId = $request->integer('pgsql_connection_id') ?: null;
+
+        $sessionName = $request->string('name')->trim()->toString();
+
+        if ($sessionName === '') {
+            $sessionName = sprintf(
+                '%s · connection stock · %s',
+                $organization->name,
+                now()->format('Y-m-d h:i A'),
+            );
+        }
+
+        $session = StockReconSession::query()->create([
+            'user_id' => $user->id,
+            'name' => $sessionName,
+            'v_id' => $organization->vendor_id,
+            'source' => 'connection',
+            'organization_id' => $organization->id,
+            'zwing_file_name' => $includeZwing ? 'mysql_ssh' : null,
+            'erp_file_name' => $includeErp ? 'pgsql connection' : null,
+            'zwing_row_count' => null,
+            'erp_row_count' => null,
+            'status' => 'pending',
+        ]);
+
+        PullStockReconciliationFromConnections::dispatch(
+            sessionId: $session->id,
+            pgsqlConnectionId: $pgsqlConnectionId,
+            includeZwing: $includeZwing,
+            includeErp: $includeErp,
+        );
+
+        return redirect()->route('stock-transaction-reconciliation.show', $session);
+    }
+
     public function show(Request $request, StockReconSession $stockReconSession): Response
     {
         abort_if($request->user() === null, 403);
@@ -63,6 +164,8 @@ class StockTransactionReconciliationController extends Controller
                 'id',
                 'name',
                 'v_id',
+                'source',
+                'organization_id',
                 'zwing_file_name',
                 'erp_file_name',
                 'zwing_log_file_name',
@@ -77,9 +180,12 @@ class StockTransactionReconciliationController extends Controller
                 'erp_log_processed_rows',
                 'zwing_skipped_rows',
                 'erp_skipped_rows',
+                'zwing_query_ms',
+                'erp_query_ms',
                 'zwing_log_skipped_rows',
                 'erp_log_skipped_rows',
                 'status',
+                'failure_reason',
                 'reconciled_at',
                 'created_at',
             ]),
@@ -289,6 +395,7 @@ class StockTransactionReconciliationController extends Controller
             'user_id' => $user->id,
             'name' => $request->string('name')->toString(),
             'v_id' => $request->integer('v_id'),
+            'source' => 'csv',
             'zwing_file_name' => $zwing?->getClientOriginalName(),
             'erp_file_name' => $erp?->getClientOriginalName(),
             'zwing_log_file_name' => $zwingLog?->getClientOriginalName(),
@@ -406,11 +513,12 @@ class StockTransactionReconciliationController extends Controller
         abort_if($request->user() === null, 403);
         abort_if($stockReconSession->user_id !== $request->user()->id, 403);
 
-        // $stockReconSession->delete();
+        $name = $stockReconSession->name;
+        $stockReconSession->delete();
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Reconciliation session ":name" deleted.', ['name' => $stockReconSession->name]),
+            'message' => __('Reconciliation session ":name" deleted.', ['name' => $name]),
         ]);
 
         return redirect()->route('stock-transaction-reconciliation.index');
