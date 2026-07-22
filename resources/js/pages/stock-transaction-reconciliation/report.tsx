@@ -4,6 +4,7 @@ import {
     Copy,
     Download,
     FileText,
+    Filter,
     Loader2,
     Search,
     X,
@@ -28,12 +29,17 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { copyToClipboard } from '@/lib/copy-to-clipboard';
-import { logDetails } from '@/routes/stock-transaction-reconciliation/report';
+import {
+    exportMethod,
+    logDetails,
+} from '@/routes/stock-transaction-reconciliation/report';
 import { index, report, show } from '@/routes/stock-transaction-reconciliation';
 
 type MatchStatus = 'matched' | 'qty_mismatch' | 'zwing_only' | 'erp_only';
+type StatusFilter = 'all' | MatchStatus;
 
 type ReportRow = {
     site_code: string;
@@ -113,42 +119,59 @@ const statusConfig: Record<
     erp_only: { label: 'ERP only', variant: 'secondary' },
 };
 
-const filters: { value: string; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'matched', label: 'Matched' },
-    { value: 'qty_mismatch', label: 'Qty mismatch' },
-    { value: 'zwing_only', label: 'Zwing only' },
-    { value: 'erp_only', label: 'ERP only' },
-];
-
 const differenceFilters: { value: DifferenceFilter; label: string }[] = [
     { value: 'all', label: 'All differences' },
-    { value: 'zero', label: 'Only exact qty match' },
-    { value: 'non_zero', label: 'Only qty difference' },
-    { value: 'missing_side', label: 'Only missing on one side' },
+    { value: 'zero', label: 'Exact qty match' },
+    { value: 'non_zero', label: 'Qty difference' },
+    { value: 'missing_side', label: 'Missing on one side' },
 ];
 
 const ANY_STOCK_POINT = '__any__';
 const ANY_SITE_CODE = '__any__';
 
-function SummaryCard({
-    label,
-    value,
-    color,
-}: {
+const statusFilterCards: {
+    value: StatusFilter;
     label: string;
-    value: number;
-    color: string;
-}) {
-    return (
-        <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-            <p className="text-xs font-medium text-muted-foreground">{label}</p>
-            <p className={`mt-1 text-2xl font-bold ${color}`}>
-                {value.toLocaleString()}
-            </p>
-        </div>
-    );
-}
+    summaryKey: keyof Summary;
+    accent: string;
+    active: string;
+}[] = [
+    {
+        value: 'all',
+        label: 'Total',
+        summaryKey: 'total',
+        accent: 'text-foreground',
+        active: 'border-foreground/40 bg-muted/60 ring-2 ring-foreground/15',
+    },
+    {
+        value: 'matched',
+        label: 'Matched',
+        summaryKey: 'matched',
+        accent: 'text-green-600 dark:text-green-400',
+        active: 'border-green-500/50 bg-green-500/10 ring-2 ring-green-500/20',
+    },
+    {
+        value: 'qty_mismatch',
+        label: 'Qty mismatch',
+        summaryKey: 'qty_mismatch',
+        accent: 'text-destructive',
+        active: 'border-destructive/50 bg-destructive/10 ring-2 ring-destructive/20',
+    },
+    {
+        value: 'zwing_only',
+        label: 'Zwing only',
+        summaryKey: 'zwing_only',
+        accent: 'text-amber-600 dark:text-amber-400',
+        active: 'border-amber-500/50 bg-amber-500/10 ring-2 ring-amber-500/20',
+    },
+    {
+        value: 'erp_only',
+        label: 'ERP only',
+        summaryKey: 'erp_only',
+        accent: 'text-blue-600 dark:text-blue-400',
+        active: 'border-blue-500/50 bg-blue-500/10 ring-2 ring-blue-500/20',
+    },
+];
 
 async function copyText(text: string, label: string): Promise<void> {
     const copied = await copyToClipboard(text);
@@ -234,6 +257,28 @@ function LogSideTable({
     );
 }
 
+function FilterChip({
+    label,
+    value,
+    onRemove,
+}: {
+    label: string;
+    value: string;
+    onRemove: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onRemove}
+            className="inline-flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-xs transition-colors hover:bg-muted"
+        >
+            <span className="text-muted-foreground">{label}</span>
+            <span className="font-medium">{value}</span>
+            <X className="size-3 text-muted-foreground" />
+        </button>
+    );
+}
+
 export default function StockTransactionReconciliationReport({
     session,
     summary,
@@ -257,7 +302,7 @@ export default function StockTransactionReconciliationReport({
 
     const activeFilters = useMemo(() => {
         return {
-            filter,
+            filter: filter as StatusFilter,
             icode_query: icodeQuery.trim(),
             site_code: siteCode === ANY_SITE_CODE ? '' : siteCode,
             stock_point: stockPoint === ANY_STOCK_POINT ? '' : stockPoint,
@@ -265,35 +310,56 @@ export default function StockTransactionReconciliationReport({
         };
     }, [difference, filter, icodeQuery, siteCode, stockPoint]);
 
-    function buildQueryParams(page = 1) {
-        return {
+    function buildQueryParams(
+        page = 1,
+        overrides: Partial<{
+            filter: string;
+            icode_query: string;
+            site_code: string;
+            stock_point: string;
+            difference: DifferenceFilter;
+        }> = {},
+    ) {
+        const next = {
             filter: activeFilters.filter,
             icode_query: activeFilters.icode_query,
             site_code: activeFilters.site_code,
             stock_point: activeFilters.stock_point,
             difference: activeFilters.difference,
+            ...overrides,
             page,
+        };
+
+        return {
+            filter: next.filter,
+            icode_query: next.icode_query,
+            site_code: next.site_code,
+            stock_point: next.stock_point,
+            difference: next.difference,
+            page: next.page,
         };
     }
 
-    const exportQueryString = useMemo(() => {
-        const params = new URLSearchParams();
+    const exportQuery = useMemo(() => {
+        const query: Record<string, string> = {};
+
         if (activeFilters.filter !== 'all') {
-            params.set('filter', activeFilters.filter);
+            query.filter = activeFilters.filter;
         }
         if (activeFilters.icode_query !== '') {
-            params.set('icode_query', activeFilters.icode_query);
+            query.icode_query = activeFilters.icode_query;
         }
         if (activeFilters.site_code !== '') {
-            params.set('site_code', activeFilters.site_code);
+            query.site_code = activeFilters.site_code;
         }
         if (activeFilters.stock_point !== '') {
-            params.set('stock_point', activeFilters.stock_point);
+            query.stock_point = activeFilters.stock_point;
         }
         if (activeFilters.difference !== 'all') {
-            params.set('difference', activeFilters.difference);
+            query.difference = activeFilters.difference;
         }
-        return params.toString();
+
+        return query;
     }, [activeFilters]);
 
     const hasAnyLogs =
@@ -375,21 +441,27 @@ export default function StockTransactionReconciliationReport({
         setLogDetailsError(null);
     }
 
-    function applyFilter(value: string) {
-        router.get(
-            report.url(session.id),
-            {
-                ...buildQueryParams(1),
-                filter: value,
-            },
-            { preserveScroll: false },
-        );
+    function navigateWithFilters(
+        overrides: Partial<{
+            filter: string;
+            icode_query: string;
+            site_code: string;
+            stock_point: string;
+            difference: DifferenceFilter;
+        }> = {},
+        page = 1,
+    ) {
+        router.get(report.url(session.id), buildQueryParams(page, overrides), {
+            preserveScroll: false,
+        });
+    }
+
+    function applyStatusFilter(value: StatusFilter) {
+        navigateWithFilters({ filter: value });
     }
 
     function applyAdvancedFilters() {
-        router.get(report.url(session.id), buildQueryParams(1), {
-            preserveScroll: false,
-        });
+        navigateWithFilters();
     }
 
     function clearFilters() {
@@ -404,12 +476,55 @@ export default function StockTransactionReconciliationReport({
         );
     }
 
+    function removeFilterChip(
+        key:
+            | 'filter'
+            | 'icode_query'
+            | 'site_code'
+            | 'stock_point'
+            | 'difference',
+    ) {
+        if (key === 'filter') {
+            applyStatusFilter('all');
+            return;
+        }
+
+        if (key === 'icode_query') {
+            setIcodeQuery('');
+            navigateWithFilters({ icode_query: '' });
+            return;
+        }
+
+        if (key === 'site_code') {
+            setSiteCode(ANY_SITE_CODE);
+            navigateWithFilters({ site_code: '' });
+            return;
+        }
+
+        if (key === 'stock_point') {
+            setStockPoint(ANY_STOCK_POINT);
+            navigateWithFilters({ stock_point: '' });
+            return;
+        }
+
+        setDifference('all');
+        navigateWithFilters({ difference: 'all' });
+    }
+
     const isFiltered =
         filter !== 'all' ||
-        activeFilters.icode_query !== '' ||
-        activeFilters.site_code !== '' ||
-        activeFilters.stock_point !== '' ||
-        difference !== 'all';
+        initialFilters.icode_query !== '' ||
+        initialFilters.site_code !== '' ||
+        initialFilters.stock_point !== '' ||
+        initialFilters.difference !== 'all';
+
+    const activeChipCount = [
+        filter !== 'all',
+        initialFilters.icode_query !== '',
+        initialFilters.site_code !== '',
+        initialFilters.stock_point !== '',
+        initialFilters.difference !== 'all',
+    ].filter(Boolean).length;
 
     function goToPage(page: number) {
         router.get(report.url(session.id), buildQueryParams(page), {
@@ -448,6 +563,14 @@ export default function StockTransactionReconciliationReport({
           logDetailsData.mismatch.erp.length
         : 0;
 
+    const statusLabel =
+        statusFilterCards.find((card) => card.value === filter)?.label ?? 'All';
+
+    const differenceLabel =
+        differenceFilters.find(
+            (option) => option.value === initialFilters.difference,
+        )?.label ?? 'All differences';
+
     return (
         <>
             <Head title={`Report — ${session.name}`} />
@@ -477,7 +600,9 @@ export default function StockTransactionReconciliationReport({
                         </div>
                     </div>
                     <a
-                        href={`/stock-transaction-reconciliation/${session.id}/report/export${exportQueryString !== '' ? `?${exportQueryString}` : ''}`}
+                        href={exportMethod.url(session.id, {
+                            query: exportQuery,
+                        })}
                         download
                     >
                         <Button variant="outline" size="sm">
@@ -488,56 +613,115 @@ export default function StockTransactionReconciliationReport({
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-                    <SummaryCard
-                        label="Total rows"
-                        value={summary.total}
-                        color="text-foreground"
-                    />
-                    <SummaryCard
-                        label="Matched"
-                        value={summary.matched}
-                        color="text-green-600 dark:text-green-400"
-                    />
-                    <SummaryCard
-                        label="Qty mismatch"
-                        value={summary.qty_mismatch}
-                        color="text-destructive"
-                    />
-                    <SummaryCard
-                        label="Zwing only"
-                        value={summary.zwing_only}
-                        color="text-amber-600 dark:text-amber-400"
-                    />
-                    <SummaryCard
-                        label="ERP only"
-                        value={summary.erp_only}
-                        color="text-blue-600 dark:text-blue-400"
-                    />
+                    {statusFilterCards.map((card) => {
+                        const isActive = filter === card.value;
+
+                        return (
+                            <button
+                                key={card.value}
+                                type="button"
+                                onClick={() => applyStatusFilter(card.value)}
+                                className={cn(
+                                    'rounded-xl border border-sidebar-border/70 p-4 text-left transition-all hover:bg-muted/40 dark:border-sidebar-border',
+                                    isActive && card.active,
+                                )}
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        {card.label}
+                                    </p>
+                                    {isActive && (
+                                        <Badge
+                                            variant="secondary"
+                                            className="h-5 px-1.5 text-[10px]"
+                                        >
+                                            Active
+                                        </Badge>
+                                    )}
+                                </div>
+                                <p
+                                    className={cn(
+                                        'mt-1 text-2xl font-bold tabular-nums',
+                                        card.accent,
+                                    )}
+                                >
+                                    {summary[card.summaryKey].toLocaleString()}
+                                </p>
+                            </button>
+                        );
+                    })}
                 </div>
 
-                <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="icode-query">Icode search</Label>
-                            <Input
-                                id="icode-query"
-                                placeholder="e.g. ND1884"
-                                value={icodeQuery}
-                                onChange={(e) => setIcodeQuery(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        applyAdvancedFilters();
-                                    }
-                                }}
-                            />
+                <div className="rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+                        <div className="flex items-center gap-2">
+                            <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
+                                <Filter className="size-4 text-muted-foreground" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium">Filters</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {activeChipCount > 0
+                                        ? `${activeChipCount} active · ${pagination.total.toLocaleString()} matching rows`
+                                        : `${pagination.total.toLocaleString()} rows in view`}
+                                </p>
+                            </div>
                         </div>
+                        {isFiltered && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearFilters}
+                                className="gap-1 text-muted-foreground"
+                            >
+                                <X className="size-3.5" />
+                                Clear all
+                            </Button>
+                        )}
+                    </div>
+
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            applyAdvancedFilters();
+                        }}
+                        className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-5"
+                    >
+                        <div className="space-y-1.5 xl:col-span-2">
+                            <Label htmlFor="icode-query">Icode</Label>
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    id="icode-query"
+                                    className="pl-8"
+                                    placeholder="Search icode…"
+                                    value={icodeQuery}
+                                    onChange={(e) =>
+                                        setIcodeQuery(e.target.value)
+                                    }
+                                />
+                            </div>
+                        </div>
+
                         <div className="space-y-1.5">
-                            <Label>Site code</Label>
+                            <Label htmlFor="site-code">Site code</Label>
                             <Select
                                 value={siteCode}
-                                onValueChange={setSiteCode}
+                                onValueChange={(value) => {
+                                    setSiteCode(value);
+                                    navigateWithFilters({
+                                        site_code:
+                                            value === ANY_SITE_CODE
+                                                ? ''
+                                                : value,
+                                        icode_query: icodeQuery.trim(),
+                                    });
+                                }}
                             >
-                                <SelectTrigger className="w-full">
+                                <SelectTrigger
+                                    id="site-code"
+                                    className="w-full"
+                                >
                                     <SelectValue placeholder="Any site code" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -552,13 +736,26 @@ export default function StockTransactionReconciliationReport({
                                 </SelectContent>
                             </Select>
                         </div>
+
                         <div className="space-y-1.5">
-                            <Label>Stock point</Label>
+                            <Label htmlFor="stock-point">Stock point</Label>
                             <Select
                                 value={stockPoint}
-                                onValueChange={setStockPoint}
+                                onValueChange={(value) => {
+                                    setStockPoint(value);
+                                    navigateWithFilters({
+                                        stock_point:
+                                            value === ANY_STOCK_POINT
+                                                ? ''
+                                                : value,
+                                        icode_query: icodeQuery.trim(),
+                                    });
+                                }}
                             >
-                                <SelectTrigger className="w-full">
+                                <SelectTrigger
+                                    id="stock-point"
+                                    className="w-full"
+                                >
                                     <SelectValue placeholder="Any stock point" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -573,15 +770,23 @@ export default function StockTransactionReconciliationReport({
                                 </SelectContent>
                             </Select>
                         </div>
+
                         <div className="space-y-1.5">
-                            <Label>Qty difference type</Label>
+                            <Label htmlFor="difference">Qty difference</Label>
                             <Select
                                 value={difference}
-                                onValueChange={(value: DifferenceFilter) =>
-                                    setDifference(value)
-                                }
+                                onValueChange={(value: DifferenceFilter) => {
+                                    setDifference(value);
+                                    navigateWithFilters({
+                                        difference: value,
+                                        icode_query: icodeQuery.trim(),
+                                    });
+                                }}
                             >
-                                <SelectTrigger className="w-full">
+                                <SelectTrigger
+                                    id="difference"
+                                    className="w-full"
+                                >
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -596,52 +801,88 @@ export default function StockTransactionReconciliationReport({
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="flex items-end gap-2">
-                            <Button
-                                size="sm"
-                                onClick={applyAdvancedFilters}
-                                className="flex-1"
-                            >
-                                <Search className="size-4" />
-                                Apply
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={clearFilters}
-                                title="Clear filters"
-                            >
-                                <X className="size-4" />
+
+                        <div className="flex items-end md:col-span-2 xl:col-span-5">
+                            <Button type="submit" size="sm" className="gap-1.5">
+                                <Search className="size-3.5" />
+                                Apply search
                             </Button>
                         </div>
-                    </div>
-                </div>
+                    </form>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    {filters.map((f) => (
-                        <Button
-                            key={f.value}
-                            variant={filter === f.value ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => applyFilter(f.value)}
-                        >
-                            {f.label}
-                        </Button>
-                    ))}
                     {isFiltered && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={clearFilters}
-                            className="cursor-pointer gap-1 text-muted-foreground"
-                        >
-                            <X className="size-3.5" />
-                            Clear filter
-                        </Button>
+                        <div className="flex flex-wrap gap-2 border-t px-4 py-3">
+                            {filter !== 'all' && (
+                                <FilterChip
+                                    label="Status"
+                                    value={statusLabel}
+                                    onRemove={() => removeFilterChip('filter')}
+                                />
+                            )}
+                            {initialFilters.icode_query !== '' && (
+                                <FilterChip
+                                    label="Icode"
+                                    value={initialFilters.icode_query}
+                                    onRemove={() =>
+                                        removeFilterChip('icode_query')
+                                    }
+                                />
+                            )}
+                            {initialFilters.site_code !== '' && (
+                                <FilterChip
+                                    label="Site"
+                                    value={initialFilters.site_code}
+                                    onRemove={() =>
+                                        removeFilterChip('site_code')
+                                    }
+                                />
+                            )}
+                            {initialFilters.stock_point !== '' && (
+                                <FilterChip
+                                    label="Stock point"
+                                    value={initialFilters.stock_point}
+                                    onRemove={() =>
+                                        removeFilterChip('stock_point')
+                                    }
+                                />
+                            )}
+                            {initialFilters.difference !== 'all' && (
+                                <FilterChip
+                                    label="Difference"
+                                    value={differenceLabel}
+                                    onRemove={() =>
+                                        removeFilterChip('difference')
+                                    }
+                                />
+                            )}
+                        </div>
                     )}
                 </div>
 
-                <div className="rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
+                <div className="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+                        <p className="text-sm text-muted-foreground">
+                            Showing{' '}
+                            <span className="font-medium text-foreground">
+                                {rows.length.toLocaleString()}
+                            </span>{' '}
+                            of{' '}
+                            <span className="font-medium text-foreground">
+                                {pagination.total.toLocaleString()}
+                            </span>{' '}
+                            rows
+                            {filter !== 'all' && (
+                                <span>
+                                    {' '}
+                                    · status{' '}
+                                    <span className="font-medium text-foreground">
+                                        {statusLabel}
+                                    </span>
+                                </span>
+                            )}
+                        </p>
+                    </div>
+
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
@@ -685,10 +926,25 @@ export default function StockTransactionReconciliationReport({
                                     <tr>
                                         <td
                                             colSpan={showLogActions ? 10 : 9}
-                                            className="px-4 py-10 text-center text-sm text-muted-foreground"
+                                            className="px-4 py-12 text-center"
                                         >
-                                            No rows found for the selected
-                                            filter.
+                                            <p className="text-sm font-medium">
+                                                No rows match these filters
+                                            </p>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                Try clearing a chip or widening
+                                                the search.
+                                            </p>
+                                            {isFiltered && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="mt-4"
+                                                    onClick={clearFilters}
+                                                >
+                                                    Clear all filters
+                                                </Button>
+                                            )}
                                         </td>
                                     </tr>
                                 )}
@@ -738,13 +994,14 @@ export default function StockTransactionReconciliationReport({
                                                     : '—'}
                                             </td>
                                             <td
-                                                className={`px-4 py-2.5 text-right font-medium tabular-nums ${
+                                                className={cn(
+                                                    'px-4 py-2.5 text-right font-medium tabular-nums',
                                                     diff === null
                                                         ? 'text-muted-foreground'
                                                         : diff === 0
                                                           ? 'text-green-600 dark:text-green-400'
-                                                          : 'text-destructive'
-                                                }`}
+                                                          : 'text-destructive',
+                                                )}
                                             >
                                                 {diff === null
                                                     ? '—'
