@@ -1,10 +1,11 @@
 <?php
 
-use App\Jobs\PullStockReconciliationFromConnections;
+use App\Jobs\PullZwingStockFromConnectionJob;
 use App\Models\Organization;
 use App\Models\StockReconSession;
 use App\Models\User;
 use App\Services\OrganizationDatabaseConnector;
+use App\Services\StockReconciliationConnectionPuller;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('stores failure reason when connection pull job fails', function () {
@@ -28,15 +29,13 @@ it('stores failure reason when connection pull job fails', function () {
         ->andThrow(new RuntimeException('relation "invitem" does not exist'));
     $connector->shouldReceive('close')->never();
 
-    $job = new PullStockReconciliationFromConnections(
+    $job = new PullZwingStockFromConnectionJob(
         sessionId: $session->id,
-        pgsqlConnectionId: null,
-        includeZwing: true,
-        includeErp: false,
+        completeSession: true,
     );
 
     try {
-        $job->handle($connector);
+        $job->handle($connector, app(StockReconciliationConnectionPuller::class));
     } catch (RuntimeException) {
         // expected
     }

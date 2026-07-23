@@ -5,6 +5,8 @@ namespace App\Enums;
 enum ExternalQueryJobType: string
 {
     case PullStock = 'pull_stock';
+    case PullStockZwing = 'pull_stock_zwing';
+    case PullStockErp = 'pull_stock_erp';
     case SyncRow = 'sync_row';
     case LogDetails = 'log_details';
     case ListZwingVendors = 'list_zwing_vendors';
@@ -27,6 +29,8 @@ enum ExternalQueryJobType: string
     {
         return match ($this) {
             self::PullStock => 'Pull stock',
+            self::PullStockZwing => 'Pull stock (Zwing)',
+            self::PullStockErp => 'Pull stock (ERP)',
             self::SyncRow => 'Sync row',
             self::LogDetails => 'Log details',
             self::ListZwingVendors => 'List Zwing vendors',

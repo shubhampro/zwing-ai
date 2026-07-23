@@ -1,18 +1,19 @@
 <?php
 
-use App\Jobs\PullStockReconciliationFromConnections;
+use App\Jobs\PullZwingStockFromConnectionJob;
 use App\Models\ExternalQueryLog;
 use App\Models\Organization;
 use App\Models\StockReconSession;
 use App\Models\User;
 use App\Services\OrganizationDatabaseConnector;
+use App\Services\StockReconciliationConnectionPuller;
 use App\Support\ExternalQueryQueue;
 use App\Support\StockReconciliationConnectionQueries;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
 use Inertia\Testing\AssertableInertia as Assert;
 
-it('dispatches connection pull on external-query queue with log', function () {
-    Queue::fake();
+it('dispatches connection pull chain on external-query queue with log', function () {
+    Bus::fake();
 
     $user = User::factory()->create();
     $organization = Organization::factory()->create([
@@ -27,13 +28,12 @@ it('dispatches connection pull on external-query queue with log', function () {
         ])
         ->assertRedirect();
 
-    Queue::assertPushedOn(
-        ExternalQueryQueue::NAME,
-        PullStockReconciliationFromConnections::class,
-    );
+    Bus::assertChained([
+        PullZwingStockFromConnectionJob::class,
+    ]);
 
     expect(ExternalQueryLog::query()->count())->toBe(1)
-        ->and(ExternalQueryLog::query()->first()?->job_type->value)->toBe('pull_stock');
+        ->and(ExternalQueryLog::query()->first()?->job_type->value)->toBe('pull_stock_zwing');
 });
 
 it('records query duration and row count after connection pull', function () {
@@ -76,16 +76,14 @@ it('records query duration and row count after connection pull', function () {
         });
     $connector->shouldReceive('close')->once()->with('runtime_mysql');
 
-    $job = new PullStockReconciliationFromConnections(
+    $job = new PullZwingStockFromConnectionJob(
         sessionId: $session->id,
-        pgsqlConnectionId: null,
-        includeZwing: true,
-        includeErp: false,
+        completeSession: true,
     );
 
     expect($job->queue)->toBe(ExternalQueryQueue::NAME);
 
-    $job->handle($connector);
+    $job->handle($connector, app(StockReconciliationConnectionPuller::class));
 
     $session->refresh();
 

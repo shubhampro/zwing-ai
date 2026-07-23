@@ -11,7 +11,8 @@ use App\Http\Requests\StoreStockReconciliationCsvRequest;
 use App\Http\Requests\SyncStockReconReportRowRequest;
 use App\Jobs\FetchStockReconLogDetailsJob;
 use App\Jobs\ParseStockReconciliationCsv;
-use App\Jobs\PullStockReconciliationFromConnections;
+use App\Jobs\PullErpStockFromConnectionJob;
+use App\Jobs\PullZwingStockFromConnectionJob;
 use App\Jobs\SyncStockReconReportRowJob;
 use App\Models\ExternalQueryLog;
 use App\Models\Organization;
@@ -22,14 +23,18 @@ use App\Models\StockReconZwingLog;
 use App\Models\User;
 use App\Services\StockReconLogDetailService;
 use App\Support\DatabaseHost;
+use App\Support\ExternalQueryQueue;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class StockTransactionReconciliationController extends Controller
 {
@@ -151,25 +156,66 @@ class StockTransactionReconciliationController extends Controller
             'status' => 'pending',
         ]);
 
-        $externalQueryLog = ExternalQueryLog::query()->create([
-            'user_id' => $user->id,
-            'stock_recon_session_id' => $session->id,
-            'job_type' => ExternalQueryJobType::PullStock,
-            'status' => ExternalQueryStatus::Pending,
-            'context' => [
-                'include_zwing' => $includeZwing,
-                'include_erp' => $includeErp,
-                'pgsql_connection_id' => $pgsqlConnectionId,
-            ],
-        ]);
+        $jobs = [];
 
-        PullStockReconciliationFromConnections::dispatch(
-            sessionId: $session->id,
-            pgsqlConnectionId: $pgsqlConnectionId,
-            includeZwing: $includeZwing,
-            includeErp: $includeErp,
-            externalQueryLogId: $externalQueryLog->id,
-        );
+        if ($includeZwing) {
+            $zwingLog = ExternalQueryLog::query()->create([
+                'user_id' => $user->id,
+                'stock_recon_session_id' => $session->id,
+                'job_type' => ExternalQueryJobType::PullStockZwing,
+                'status' => ExternalQueryStatus::Pending,
+                'context' => [
+                    'side' => 'zwing',
+                    'pgsql_connection_id' => $pgsqlConnectionId,
+                ],
+            ]);
+
+            $jobs[] = new PullZwingStockFromConnectionJob(
+                sessionId: $session->id,
+                externalQueryLogId: $zwingLog->id,
+                completeSession: ! $includeErp,
+            );
+        }
+
+        if ($includeErp) {
+            $erpLog = ExternalQueryLog::query()->create([
+                'user_id' => $user->id,
+                'stock_recon_session_id' => $session->id,
+                'job_type' => ExternalQueryJobType::PullStockErp,
+                'status' => ExternalQueryStatus::Pending,
+                'context' => [
+                    'side' => 'erp',
+                    'pgsql_connection_id' => $pgsqlConnectionId,
+                ],
+            ]);
+
+            $jobs[] = new PullErpStockFromConnectionJob(
+                sessionId: $session->id,
+                pgsqlConnectionId: (int) $pgsqlConnectionId,
+                externalQueryLogId: $erpLog->id,
+            );
+        }
+
+        $sessionId = $session->id;
+
+        Bus::chain($jobs)
+            ->onQueue(ExternalQueryQueue::NAME)
+            ->catch(function (Throwable $exception) use ($sessionId): void {
+                $message = preg_replace(
+                    '/Database:\s*[^,]*/i',
+                    'Database: [hidden]',
+                    $exception->getMessage(),
+                ) ?? $exception->getMessage();
+
+                StockReconSession::query()
+                    ->where('id', $sessionId)
+                    ->where('status', '!=', 'failed')
+                    ->update([
+                        'status' => 'failed',
+                        'failure_reason' => Str::limit($message, 2000),
+                    ]);
+            })
+            ->dispatch();
 
         return redirect()->route('stock-transaction-reconciliation.show', $session);
     }

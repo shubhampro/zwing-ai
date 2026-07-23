@@ -1,12 +1,14 @@
 <?php
 
-use App\Jobs\PullStockReconciliationFromConnections;
+use App\Enums\ExternalQueryJobType;
+use App\Jobs\PullErpStockFromConnectionJob;
+use App\Jobs\PullZwingStockFromConnectionJob;
+use App\Models\ExternalQueryLog;
 use App\Models\Organization;
 use App\Models\OrganizationDatabaseConnection;
 use App\Models\StockReconSession;
 use App\Models\User;
-use App\Support\ExternalQueryQueue;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('guests are redirected from create-from-connections', function () {
@@ -43,8 +45,8 @@ test('authenticated users can visit create-from-connections with orgs that have 
             ->missing('organizations.0.pgsql_connections.0.password'));
 });
 
-test('connection pull creates session and dispatches job using mysql_ssh', function () {
-    Queue::fake();
+test('connection pull creates session and chains zwing then erp jobs', function () {
+    Bus::fake();
 
     $user = User::factory()->create();
     $organization = Organization::factory()->create([
@@ -76,19 +78,26 @@ test('connection pull creates session and dispatches job using mysql_ssh', funct
         ->and($session->erp_file_name)->toBe('pgsql connection')
         ->and($session->status)->toBe('pending');
 
-    Queue::assertPushedOn(
-        ExternalQueryQueue::NAME,
-        PullStockReconciliationFromConnections::class,
-        fn (PullStockReconciliationFromConnections $job) => $job->sessionId === $session->id
-            && $job->pgsqlConnectionId === $pgsql->id
-            && $job->includeZwing === true
-            && $job->includeErp === true
-            && $job->externalQueryLogId !== null,
-    );
+    Bus::assertChained([
+        new PullZwingStockFromConnectionJob(
+            sessionId: $session->id,
+            externalQueryLogId: (int) ExternalQueryLog::query()
+                ->where('job_type', ExternalQueryJobType::PullStockZwing)
+                ->value('id'),
+            completeSession: false,
+        ),
+        new PullErpStockFromConnectionJob(
+            sessionId: $session->id,
+            pgsqlConnectionId: $pgsql->id,
+            externalQueryLogId: (int) ExternalQueryLog::query()
+                ->where('job_type', ExternalQueryJobType::PullStockErp)
+                ->value('id'),
+        ),
+    ]);
 });
 
 test('connection pull auto-generates session name when blank', function () {
-    Queue::fake();
+    Bus::fake();
 
     $user = User::factory()->create();
     $organization = Organization::factory()->create([

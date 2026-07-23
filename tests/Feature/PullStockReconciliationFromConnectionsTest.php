@@ -1,10 +1,11 @@
 <?php
 
-use App\Jobs\PullStockReconciliationFromConnections;
+use App\Jobs\PullZwingStockFromConnectionJob;
 use App\Models\Organization;
 use App\Models\StockReconSession;
 use App\Models\User;
 use App\Services\OrganizationDatabaseConnector;
+use App\Services\StockReconciliationConnectionPuller;
 use App\Support\StockReconciliationConnectionQueries;
 use Illuminate\Support\Facades\DB;
 
@@ -60,14 +61,12 @@ it('pulls zwing rows through mysql_ssh connector and marks session completed', f
         });
     $connector->shouldReceive('close')->once()->with('runtime_mysql');
 
-    $job = new PullStockReconciliationFromConnections(
+    $job = new PullZwingStockFromConnectionJob(
         sessionId: $session->id,
-        pgsqlConnectionId: null,
-        includeZwing: true,
-        includeErp: false,
+        completeSession: true,
     );
 
-    $job->handle($connector);
+    $job->handle($connector, app(StockReconciliationConnectionPuller::class));
 
     $session->refresh();
 
