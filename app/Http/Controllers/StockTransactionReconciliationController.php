@@ -273,7 +273,6 @@ class StockTransactionReconciliationController extends Controller
         $page = max(1, (int) $request->get('page', 1));
         $sessionId = $stockReconSession->id;
 
-        $comparisonSql = $this->comparisonSql();
         [$filterClause, $filterParams] = $this->buildReportConstraints(
             filter: $filter,
             icodeQuery: $icodeQuery,
@@ -282,24 +281,12 @@ class StockTransactionReconciliationController extends Controller
             difference: $difference,
         );
 
-        $summary = DB::selectOne(<<<SQL
-            SELECT
-                COUNT(*) AS total,
-                COUNT(*) FILTER (WHERE match_status = 'matched')      AS matched,
-                COUNT(*) FILTER (WHERE match_status = 'qty_mismatch') AS qty_mismatch,
-                COUNT(*) FILTER (WHERE match_status = 'zwing_only')   AS zwing_only,
-                COUNT(*) FILTER (WHERE match_status = 'erp_only')     AS erp_only
-            FROM ({$comparisonSql}) AS cmp
-        SQL, [$sessionId]);
-
-        $totalRows = DB::selectOne(
-            "SELECT COUNT(*) AS total FROM ({$comparisonSql}) AS cmp {$filterClause}",
-            array_merge([$sessionId], $filterParams),
-        )->total;
-
-        $rows = DB::select(
-            "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY site_code, icode LIMIT ? OFFSET ?",
-            array_merge([$sessionId], $filterParams, [$perPage, ($page - 1) * $perPage]),
+        [$summary, $totalRows, $rows, $siteCodeOptions, $stockPointOptions] = $this->loadReportPageData(
+            sessionId: $sessionId,
+            filterClause: $filterClause,
+            filterParams: $filterParams,
+            perPage: $perPage,
+            page: $page,
         );
 
         return Inertia::render('stock-transaction-reconciliation/report', [
@@ -317,10 +304,10 @@ class StockTransactionReconciliationController extends Controller
             'summary' => $summary,
             'rows' => $rows,
             'pagination' => [
-                'total' => (int) $totalRows,
+                'total' => $totalRows,
                 'per_page' => $perPage,
                 'current_page' => $page,
-                'last_page' => (int) ceil((int) $totalRows / $perPage),
+                'last_page' => (int) ceil($totalRows / $perPage),
             ],
             'filter' => $filter,
             'filters' => [
@@ -329,8 +316,8 @@ class StockTransactionReconciliationController extends Controller
                 'stock_point' => $stockPoint,
                 'difference' => $difference,
             ],
-            'siteCodeOptions' => $this->distinctSiteCodeOptions($sessionId),
-            'stockPointOptions' => $this->distinctStockPointOptions($sessionId),
+            'siteCodeOptions' => $siteCodeOptions,
+            'stockPointOptions' => $stockPointOptions,
         ]);
     }
 
@@ -426,10 +413,8 @@ class StockTransactionReconciliationController extends Controller
             difference: $difference,
         );
 
-        $rows = DB::select(
-            "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY site_code, icode",
-            array_merge([$sessionId], $filterParams),
-        );
+        $sql = "SELECT * FROM ({$comparisonSql}) AS cmp {$filterClause} ORDER BY site_code, icode";
+        $bindings = array_merge($this->comparisonBindings($sessionId), $filterParams);
 
         $segment = $filter === 'all' ? 'all' : $filter;
         if ($icodeQuery !== '' || $siteCode !== '' || $stockPoint !== '' || $difference !== 'all') {
@@ -438,7 +423,7 @@ class StockTransactionReconciliationController extends Controller
         $slug = preg_replace('/[^a-z0-9]+/i', '-', $stockReconSession->name);
         $filename = "{$slug}-{$segment}.csv";
 
-        return response()->streamDownload(function () use ($rows): void {
+        return response()->streamDownload(function () use ($sql, $bindings): void {
             $handle = fopen('php://output', 'w');
 
             if ($handle === false) {
@@ -447,7 +432,7 @@ class StockTransactionReconciliationController extends Controller
 
             fputcsv($handle, ['site_code', 'icode', 'batch_no', 'sprefcode', 'stock_point_name', 'zwing_qty', 'erp_qty', 'difference', 'status']);
 
-            foreach ($rows as $row) {
+            foreach (DB::cursor($sql, $bindings) as $row) {
                 $zwingQty = $row->zwing_qty;
                 $erpQty = $row->erp_qty;
                 $diff = ($zwingQty !== null && $erpQty !== null) ? $zwingQty - $erpQty : '';
@@ -648,6 +633,65 @@ class StockTransactionReconciliationController extends Controller
         return redirect()->route('stock-transaction-reconciliation.index');
     }
 
+    /**
+     * Materialize the session comparison once, then run summary/count/page against it.
+     *
+     * @param  array<int, mixed>  $filterParams
+     * @return array{0: object, 1: int, 2: list<object>, 3: list<string>, 4: list<string>}
+     */
+    private function loadReportPageData(
+        int $sessionId,
+        string $filterClause,
+        array $filterParams,
+        int $perPage,
+        int $page,
+    ): array {
+        $table = 'stock_recon_report_cmp_'.bin2hex(random_bytes(8));
+
+        return DB::transaction(function () use ($sessionId, $filterClause, $filterParams, $perPage, $page, $table): array {
+            DB::statement(
+                "CREATE TEMPORARY TABLE {$table} AS {$this->comparisonSql()}",
+                $this->comparisonBindings($sessionId),
+            );
+
+            try {
+                $summary = DB::selectOne(<<<SQL
+                    SELECT
+                        COUNT(*) AS total,
+                        COUNT(*) FILTER (WHERE match_status = 'matched')      AS matched,
+                        COUNT(*) FILTER (WHERE match_status = 'qty_mismatch') AS qty_mismatch,
+                        COUNT(*) FILTER (WHERE match_status = 'zwing_only')   AS zwing_only,
+                        COUNT(*) FILTER (WHERE match_status = 'erp_only')     AS erp_only
+                    FROM {$table}
+                SQL);
+
+                $totalRows = (int) DB::selectOne(
+                    "SELECT COUNT(*) AS total FROM {$table} {$filterClause}",
+                    $filterParams,
+                )->total;
+
+                $rows = DB::select(
+                    "SELECT * FROM {$table} {$filterClause} ORDER BY site_code, icode LIMIT ? OFFSET ?",
+                    array_merge($filterParams, [$perPage, ($page - 1) * $perPage]),
+                );
+
+                [$siteCodeOptions, $stockPointOptions] = $this->reportFilterOptions($sessionId);
+
+                return [$summary, $totalRows, $rows, $siteCodeOptions, $stockPointOptions];
+            } finally {
+                DB::statement("DROP TABLE IF EXISTS {$table}");
+            }
+        });
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    private function comparisonBindings(int $sessionId): array
+    {
+        return [$sessionId, $sessionId];
+    }
+
     private function comparisonSql(): string
     {
         return <<<'SQL'
@@ -665,14 +709,20 @@ class StockTransactionReconciliationController extends Controller
                     WHEN z.qty = e.qty THEN 'matched'
                     ELSE 'qty_mismatch'
                 END AS match_status
-            FROM zwing_stock_reconsile z
-            FULL OUTER JOIN erp_stock_reconsile e
-                ON  z.session_id = e.session_id
-                AND z.site_code  = e.site_code
+            FROM (
+                SELECT id, site_code, icode, batch_no, sprefcode, stock_point_name, qty
+                FROM zwing_stock_reconsile
+                WHERE session_id = ?
+            ) z
+            FULL OUTER JOIN (
+                SELECT id, site_code, icode, batch_no, sprefcode, stock_point_name, qty
+                FROM erp_stock_reconsile
+                WHERE session_id = ?
+            ) e
+                ON  z.site_code  = e.site_code
                 AND z.icode      = e.icode
                 AND z.batch_no   = e.batch_no
                 AND z.sprefcode  = e.sprefcode
-            WHERE COALESCE(z.session_id, e.session_id) = ?
         SQL;
     }
 
@@ -696,25 +746,52 @@ class StockTransactionReconciliationController extends Controller
     }
 
     /**
-     * @return array<int, string>
+     * @return array{0: list<string>, 1: list<string>}
      */
-    private function distinctSiteCodeOptions(int $sessionId): array
+    private function reportFilterOptions(int $sessionId): array
     {
-        $zwing = DB::table('zwing_stock_reconsile')
-            ->where('session_id', $sessionId)
-            ->whereNotNull('site_code')
-            ->where('site_code', '!=', '')
-            ->distinct()
-            ->pluck('site_code');
+        $rows = DB::select(<<<'SQL'
+            SELECT kind, value
+            FROM (
+                SELECT 'site_code' AS kind, site_code AS value
+                FROM zwing_stock_reconsile
+                WHERE session_id = ?
+                  AND site_code IS NOT NULL
+                  AND site_code != ''
+                UNION
+                SELECT 'site_code', site_code
+                FROM erp_stock_reconsile
+                WHERE session_id = ?
+                  AND site_code IS NOT NULL
+                  AND site_code != ''
+                UNION
+                SELECT 'stock_point', stock_point_name
+                FROM zwing_stock_reconsile
+                WHERE session_id = ?
+                  AND stock_point_name IS NOT NULL
+                  AND stock_point_name != ''
+                UNION
+                SELECT 'stock_point', stock_point_name
+                FROM erp_stock_reconsile
+                WHERE session_id = ?
+                  AND stock_point_name IS NOT NULL
+                  AND stock_point_name != ''
+            ) AS opts
+            ORDER BY kind, value
+        SQL, [$sessionId, $sessionId, $sessionId, $sessionId]);
 
-        $erp = DB::table('erp_stock_reconsile')
-            ->where('session_id', $sessionId)
-            ->whereNotNull('site_code')
-            ->where('site_code', '!=', '')
-            ->distinct()
-            ->pluck('site_code');
+        $siteCodes = [];
+        $stockPoints = [];
 
-        return $zwing->merge($erp)->unique()->sort()->values()->all();
+        foreach ($rows as $row) {
+            if ($row->kind === 'site_code') {
+                $siteCodes[] = (string) $row->value;
+            } else {
+                $stockPoints[] = (string) $row->value;
+            }
+        }
+
+        return [$siteCodes, $stockPoints];
     }
 
     /**
@@ -748,28 +825,6 @@ class StockTransactionReconciliationController extends Controller
     }
 
     /**
-     * @return array<int, string>
-     */
-    private function distinctStockPointOptions(int $sessionId): array
-    {
-        $zwing = DB::table('zwing_stock_reconsile')
-            ->where('session_id', $sessionId)
-            ->whereNotNull('stock_point_name')
-            ->where('stock_point_name', '!=', '')
-            ->distinct()
-            ->pluck('stock_point_name');
-
-        $erp = DB::table('erp_stock_reconsile')
-            ->where('session_id', $sessionId)
-            ->whereNotNull('stock_point_name')
-            ->where('stock_point_name', '!=', '')
-            ->distinct()
-            ->pluck('stock_point_name');
-
-        return $zwing->merge($erp)->unique()->sort()->values()->all();
-    }
-
-    /**
      * @return array{0: string, 1: array<int, mixed>}
      */
     private function buildReportConstraints(
@@ -788,7 +843,8 @@ class StockTransactionReconciliationController extends Controller
         }
 
         if ($icodeQuery !== '') {
-            $clauses[] = 'icode ILIKE ?';
+            $likeOperator = DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
+            $clauses[] = "icode {$likeOperator} ?";
             $params[] = "%{$icodeQuery}%";
         }
 

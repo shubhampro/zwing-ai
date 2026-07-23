@@ -357,6 +357,168 @@ test('report applies icode search, stock point filter, and difference filters', 
             ->where('stockPointOptions', ['Packet', 'SALE', 'Shelf']));
 });
 
+test('report summary and match statuses cover matched mismatch and one-sided rows', function () {
+    $user = User::factory()->create();
+    $session = StockReconSession::create([
+        'user_id' => $user->id,
+        'name' => 'status-parity',
+        'v_id' => 1,
+        'status' => 'completed',
+    ]);
+
+    $now = now()->toDateTimeString();
+
+    DB::table('zwing_stock_reconsile')->insert([
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B1', 'barcode' => 'A', 'icode' => 'MATCH-1', 'stock_point_name' => 'Store', 'site_code' => '10', 'sprefcode' => 1, 'qty' => 5, 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B2', 'barcode' => 'A', 'icode' => 'MISMATCH-1', 'stock_point_name' => 'Store', 'site_code' => '10', 'sprefcode' => 2, 'qty' => 8, 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B3', 'barcode' => 'A', 'icode' => 'ZWING-ONLY', 'stock_point_name' => 'Store', 'site_code' => '10', 'sprefcode' => 3, 'qty' => 3, 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
+    DB::table('erp_stock_reconsile')->insert([
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B1', 'barcode' => 'A', 'icode' => 'MATCH-1', 'stock_point_name' => 'Store', 'site_code' => '10', 'sprefcode' => 1, 'qty' => 5, 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B2', 'barcode' => 'A', 'icode' => 'MISMATCH-1', 'stock_point_name' => 'Store', 'site_code' => '10', 'sprefcode' => 2, 'qty' => 9, 'created_at' => $now, 'updated_at' => $now],
+        ['session_id' => $session->id, 'v_id' => 1, 'batch_no' => 'B4', 'barcode' => 'A', 'icode' => 'ERP-ONLY', 'stock_point_name' => 'Store', 'site_code' => '10', 'sprefcode' => 4, 'qty' => 2, 'created_at' => $now, 'updated_at' => $now],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('stock-transaction-reconciliation.report', $session))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('stock-transaction-reconciliation/report')
+            ->where('summary.total', 4)
+            ->where('summary.matched', 1)
+            ->where('summary.qty_mismatch', 1)
+            ->where('summary.zwing_only', 1)
+            ->where('summary.erp_only', 1)
+            ->where('pagination.total', 4)
+            ->where('pagination.per_page', 100)
+            ->where('pagination.current_page', 1)
+            ->where('pagination.last_page', 1)
+            ->has('rows', 4)
+            ->where('rows', fn ($rows) => collect($rows)->pluck('match_status')->sort()->values()->all() === [
+                'erp_only',
+                'matched',
+                'qty_mismatch',
+                'zwing_only',
+            ]));
+});
+
+test('report pagination totals match filtered row counts', function () {
+    $user = User::factory()->create();
+    $session = StockReconSession::create([
+        'user_id' => $user->id,
+        'name' => 'pagination-parity',
+        'v_id' => 1,
+        'status' => 'completed',
+    ]);
+
+    $now = now()->toDateTimeString();
+    $zwingRows = [];
+    $erpRows = [];
+
+    for ($i = 1; $i <= 3; $i++) {
+        $zwingRows[] = [
+            'session_id' => $session->id,
+            'v_id' => 1,
+            'batch_no' => "B{$i}",
+            'barcode' => 'A',
+            'icode' => sprintf('SKU-%03d', $i),
+            'stock_point_name' => 'Store',
+            'site_code' => '10',
+            'sprefcode' => $i,
+            'qty' => $i,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+        $erpRows[] = [
+            'session_id' => $session->id,
+            'v_id' => 1,
+            'batch_no' => "B{$i}",
+            'barcode' => 'A',
+            'icode' => sprintf('SKU-%03d', $i),
+            'stock_point_name' => 'Store',
+            'site_code' => '10',
+            'sprefcode' => $i,
+            'qty' => $i === 2 ? 99 : $i,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+    }
+
+    DB::table('zwing_stock_reconsile')->insert($zwingRows);
+    DB::table('erp_stock_reconsile')->insert($erpRows);
+
+    $this->actingAs($user)
+        ->get(route('stock-transaction-reconciliation.report', [
+            'stockReconSession' => $session,
+            'filter' => 'qty_mismatch',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('stock-transaction-reconciliation/report')
+            ->where('summary.total', 3)
+            ->where('summary.qty_mismatch', 1)
+            ->where('pagination.total', 1)
+            ->has('rows', 1)
+            ->where('rows.0.icode', 'SKU-002')
+            ->where('rows.0.match_status', 'qty_mismatch'));
+});
+
+test('report export streams csv with expected header and status rows', function () {
+    $user = User::factory()->create();
+    $session = StockReconSession::create([
+        'user_id' => $user->id,
+        'name' => 'Export Session',
+        'v_id' => 1,
+        'status' => 'completed',
+    ]);
+
+    $now = now()->toDateTimeString();
+
+    DB::table('zwing_stock_reconsile')->insert([
+        'session_id' => $session->id,
+        'v_id' => 1,
+        'batch_no' => 'B1',
+        'barcode' => 'A',
+        'icode' => 'EXPORT-1',
+        'stock_point_name' => 'Store',
+        'site_code' => '10',
+        'sprefcode' => 1,
+        'qty' => 10,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    DB::table('erp_stock_reconsile')->insert([
+        'session_id' => $session->id,
+        'v_id' => 1,
+        'batch_no' => 'B1',
+        'barcode' => 'A',
+        'icode' => 'EXPORT-1',
+        'stock_point_name' => 'Store',
+        'site_code' => '10',
+        'sprefcode' => 1,
+        'qty' => 7,
+        'created_at' => $now,
+        'updated_at' => $now,
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('stock-transaction-reconciliation.report.export', [
+            'stockReconSession' => $session,
+            'difference' => 'non_zero',
+        ]))
+        ->assertOk();
+
+    $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    $csv = $response->streamedContent();
+    $lines = array_values(array_filter(preg_split("/\r\n|\n|\r/", $csv) ?: []));
+
+    expect($lines[0])->toBe('site_code,icode,batch_no,sprefcode,stock_point_name,zwing_qty,erp_qty,difference,status');
+    expect($lines[1])->toBe('10,EXPORT-1,B1,1,Store,10,7,3,qty_mismatch');
+});
+
 test('authenticated users can view zwing logs page', function () {
     $user = User::factory()->create();
     $session = StockReconSession::create([
