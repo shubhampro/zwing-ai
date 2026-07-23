@@ -44,7 +44,7 @@ php artisan wayfinder:generate --no-interaction
 npm run build
 php artisan migrate --force
 php artisan optimize
-php artisan queue:restart
+php artisan horizon:terminate
 
 if command -v systemctl >/dev/null 2>&1; then
   if sudo -n systemctl reload php8.4-fpm 2>/dev/null; then

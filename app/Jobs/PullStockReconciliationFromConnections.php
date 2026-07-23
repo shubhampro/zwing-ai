@@ -24,7 +24,7 @@ class PullStockReconciliationFromConnections implements ShouldQueue
 
     private const CHUNK_SIZE = 500;
 
-    public int $timeout = 60;
+    public int $timeout = 90;
 
     public int $tries = 1;
 
