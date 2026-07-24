@@ -354,7 +354,15 @@ test('report applies icode search, stock point filter, and difference filters', 
             ->where('filters.stock_point', 'Packet')
             ->where('filters.difference', 'non_zero')
             ->where('siteCodeOptions', ['10', '20'])
-            ->where('stockPointOptions', ['Packet', 'SALE', 'Shelf']));
+            ->where('stockPointOptions', ['Packet', 'SALE', 'Shelf'])
+            ->reloadOnly(['summary', 'rows', 'pagination', 'filter', 'filters'], function (Assert $reload) {
+                $reload
+                    ->has('rows', 1)
+                    ->where('rows.0.icode', 'ND-SEARCH-001')
+                    ->where('filters.icode_query', '001')
+                    ->where('pagination.total', 1)
+                    ->missing('siteCodeOptions');
+            }));
 });
 
 test('report summary and match statuses cover matched mismatch and one-sided rows', function () {

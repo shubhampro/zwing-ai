@@ -10,7 +10,7 @@ import {
     Search,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,22 @@ import { index, report, show } from '@/routes/stock-transaction-reconciliation';
 
 type MatchStatus = 'matched' | 'qty_mismatch' | 'zwing_only' | 'erp_only';
 type StatusFilter = 'all' | MatchStatus;
+
+const REPORT_FILTER_PARTIAL = [
+    'summary',
+    'rows',
+    'pagination',
+    'filter',
+    'filters',
+] as const;
+
+const REPORT_FILTER_VISIT = {
+    preserveState: true,
+    preserveScroll: true,
+    only: [...REPORT_FILTER_PARTIAL],
+};
+
+const ICODE_SEARCH_DEBOUNCE_MS = 300;
 
 type ReportRow = {
     site_code: string;
@@ -366,6 +382,7 @@ export default function StockTransactionReconciliationReport({
     const [difference, setDifference] = useState<DifferenceFilter>(
         initialFilters.difference,
     );
+    const skipIcodeDebounceRef = useRef(false);
 
     useEffect(() => {
         setTableRows(rows);
@@ -381,35 +398,78 @@ export default function StockTransactionReconciliationReport({
         };
     }, [difference, filter, icodeQuery, siteCode, stockPoint]);
 
-    function buildQueryParams(
-        page = 1,
-        overrides: Partial<{
-            filter: string;
-            icode_query: string;
-            site_code: string;
-            stock_point: string;
-            difference: DifferenceFilter;
-        }> = {},
-    ) {
-        const next = {
-            filter: activeFilters.filter,
-            icode_query: activeFilters.icode_query,
-            site_code: activeFilters.site_code,
-            stock_point: activeFilters.stock_point,
-            difference: activeFilters.difference,
-            ...overrides,
-            page,
-        };
+    const buildQueryParams = useCallback(
+        (
+            page = 1,
+            overrides: Partial<{
+                filter: string;
+                icode_query: string;
+                site_code: string;
+                stock_point: string;
+                difference: DifferenceFilter;
+            }> = {},
+        ) => {
+            const next = {
+                filter: activeFilters.filter,
+                icode_query: activeFilters.icode_query,
+                site_code: activeFilters.site_code,
+                stock_point: activeFilters.stock_point,
+                difference: activeFilters.difference,
+                ...overrides,
+                page,
+            };
 
-        return {
-            filter: next.filter,
-            icode_query: next.icode_query,
-            site_code: next.site_code,
-            stock_point: next.stock_point,
-            difference: next.difference,
-            page: next.page,
-        };
-    }
+            return {
+                filter: next.filter,
+                icode_query: next.icode_query,
+                site_code: next.site_code,
+                stock_point: next.stock_point,
+                difference: next.difference,
+                page: next.page,
+            };
+        },
+        [activeFilters],
+    );
+
+    const navigateWithFilters = useCallback(
+        (
+            overrides: Partial<{
+                filter: string;
+                icode_query: string;
+                site_code: string;
+                stock_point: string;
+                difference: DifferenceFilter;
+            }> = {},
+            page = 1,
+        ) => {
+            router.get(
+                report.url(session.id),
+                buildQueryParams(page, overrides),
+                REPORT_FILTER_VISIT,
+            );
+        },
+        [buildQueryParams, session.id],
+    );
+
+    useEffect(() => {
+        if (skipIcodeDebounceRef.current) {
+            skipIcodeDebounceRef.current = false;
+
+            return;
+        }
+
+        const trimmed = icodeQuery.trim();
+
+        if (trimmed === initialFilters.icode_query) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            navigateWithFilters({ icode_query: trimmed });
+        }, ICODE_SEARCH_DEBOUNCE_MS);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [icodeQuery, initialFilters.icode_query, navigateWithFilters]);
 
     const exportQuery = useMemo(() => {
         const query: Record<string, string> = {};
@@ -654,21 +714,6 @@ export default function StockTransactionReconciliationReport({
         }
     }
 
-    function navigateWithFilters(
-        overrides: Partial<{
-            filter: string;
-            icode_query: string;
-            site_code: string;
-            stock_point: string;
-            difference: DifferenceFilter;
-        }> = {},
-        page = 1,
-    ) {
-        router.get(report.url(session.id), buildQueryParams(page, overrides), {
-            preserveScroll: false,
-        });
-    }
-
     function applyStatusFilter(value: StatusFilter) {
         navigateWithFilters({ filter: value });
     }
@@ -678,14 +723,22 @@ export default function StockTransactionReconciliationReport({
     }
 
     function clearFilters() {
+        skipIcodeDebounceRef.current = true;
         setIcodeQuery('');
         setSiteCode(ANY_SITE_CODE);
         setStockPoint(ANY_STOCK_POINT);
         setDifference('all');
         router.get(
             report.url(session.id),
-            { filter: 'all', page: 1 },
-            { preserveScroll: false },
+            {
+                filter: 'all',
+                icode_query: '',
+                site_code: '',
+                stock_point: '',
+                difference: 'all',
+                page: 1,
+            },
+            REPORT_FILTER_VISIT,
         );
     }
 
@@ -703,6 +756,7 @@ export default function StockTransactionReconciliationReport({
         }
 
         if (key === 'icode_query') {
+            skipIcodeDebounceRef.current = true;
             setIcodeQuery('');
             navigateWithFilters({ icode_query: '' });
             return;
@@ -740,9 +794,11 @@ export default function StockTransactionReconciliationReport({
     ].filter(Boolean).length;
 
     function goToPage(page: number) {
-        router.get(report.url(session.id), buildQueryParams(page), {
-            preserveScroll: true,
-        });
+        router.get(
+            report.url(session.id),
+            buildQueryParams(page),
+            REPORT_FILTER_VISIT,
+        );
     }
 
     const selectedDiff =
