@@ -44,6 +44,10 @@ final class Permissions
 
     public const TransactionCheckerManage = 'transaction-checker.manage';
 
+    public const TransactionReconView = 'transaction-recon.view';
+
+    public const TransactionReconManage = 'transaction-recon.manage';
+
     public const InboundEventsView = 'inbound-events.view';
 
     public const InboundEventsManage = 'inbound-events.manage';
@@ -55,6 +59,10 @@ final class Permissions
     public const SqlQueriesView = 'sql-queries.view';
 
     public const SqlQueriesManage = 'sql-queries.manage';
+
+    public const PayloadComposersView = 'payload-composers.view';
+
+    public const PayloadComposersManage = 'payload-composers.manage';
 
     public const ServerHealthView = 'server-health.view';
 
@@ -86,12 +94,16 @@ final class Permissions
             self::ExpenseCashReconManage,
             self::TransactionCheckerView,
             self::TransactionCheckerManage,
+            self::TransactionReconView,
+            self::TransactionReconManage,
             self::InboundEventsView,
             self::InboundEventsManage,
             self::OutboundSyncView,
             self::OutboundSyncManage,
             self::SqlQueriesView,
             self::SqlQueriesManage,
+            self::PayloadComposersView,
+            self::PayloadComposersManage,
             self::ServerHealthView,
             self::ServerHealthManage,
         ];

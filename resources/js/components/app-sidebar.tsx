@@ -11,6 +11,7 @@ import {
     KeyRound,
     LayoutGrid,
     Mail,
+    Package,
     PlayCircle,
     Plug,
     RefreshCw,
@@ -18,6 +19,7 @@ import {
     Shield,
     Users,
     Wallet,
+    WandSparkles,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import AppLogo from '@/components/app-logo';
@@ -42,6 +44,7 @@ import { index as invitesIndex } from '@/routes/invites';
 import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconciliation';
 import { index as organizationsIndex } from '@/routes/organizations';
 import { index as outboundSyncIndex } from '@/routes/outbound-sync';
+import { index as payloadComposersIndex } from '@/routes/payload-composers';
 import { index as rolesIndex } from '@/routes/roles';
 import { index as serverHealthIndex } from '@/routes/server-health';
 import { index as sqlQueriesIndex } from '@/routes/sql-queries';
@@ -49,6 +52,7 @@ import { index as stockTransactionReconciliationIndex } from '@/routes/stock-tra
 import { index as thirdPartyApiBatchesIndex } from '@/routes/third-party-api-batches';
 import { index as thirdPartyApisIndex } from '@/routes/third-party-apis';
 import { index as transactionCheckerIndex } from '@/routes/transaction-checker';
+import { index as transactionReconciliationIndex } from '@/routes/transaction-reconciliation';
 import { index as usersIndex } from '@/routes/users';
 import type { NavItem } from '@/types';
 
@@ -123,6 +127,12 @@ const mainNavItems: NavItem[] = [
                 permission: 'transaction-checker.view',
             },
             {
+                title: 'Transaction reconciliation',
+                href: transactionReconciliationIndex.url(),
+                icon: Package,
+                permission: 'transaction-recon.view',
+            },
+            {
                 title: 'Invoice reconciliation',
                 href: invoiceReconciliationIndex.url(),
                 icon: FileText,
@@ -185,6 +195,12 @@ const mainNavItems: NavItem[] = [
         href: sqlQueriesIndex.url(),
         icon: Database,
         permission: 'sql-queries.view',
+    },
+    {
+        title: 'Payload composers',
+        href: payloadComposersIndex.url(),
+        icon: WandSparkles,
+        permission: 'payload-composers.view',
     },
 ];
 

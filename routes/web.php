@@ -12,6 +12,7 @@ use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationDatabaseConnectionController;
 use App\Http\Controllers\OrganizationThirdPartyApiController;
 use App\Http\Controllers\OutboundSyncController;
+use App\Http\Controllers\PayloadComposerController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ServerHealthController;
 use App\Http\Controllers\SqlQueryController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\StockTransactionReconciliationController;
 use App\Http\Controllers\ThirdPartyApiBatchController;
 use App\Http\Controllers\ThirdPartyApiController;
 use App\Http\Controllers\TransactionCheckerController;
+use App\Http\Controllers\TransactionReconciliationController;
 use App\Http\Controllers\UserController;
 use App\Support\Permissions;
 use Illuminate\Support\Facades\Route;
@@ -222,6 +224,28 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
         ->middleware('permission:'.Permissions::StockReconManage)
         ->name('stock-transaction-reconciliation.destroy');
 
+    Route::get('transaction-reconciliation', [TransactionReconciliationController::class, 'index'])
+        ->middleware('permission:'.Permissions::TransactionReconView)
+        ->name('transaction-reconciliation.index');
+    Route::get('transaction-reconciliation/create', [TransactionReconciliationController::class, 'create'])
+        ->middleware('permission:'.Permissions::TransactionReconManage)
+        ->name('transaction-reconciliation.create');
+    Route::post('transaction-reconciliation', [TransactionReconciliationController::class, 'store'])
+        ->middleware('permission:'.Permissions::TransactionReconManage)
+        ->name('transaction-reconciliation.store');
+    Route::get('transaction-reconciliation/{transactionReconSession}', [TransactionReconciliationController::class, 'show'])
+        ->middleware('permission:'.Permissions::TransactionReconView)
+        ->name('transaction-reconciliation.show');
+    Route::get('transaction-reconciliation/{transactionReconSession}/report', [TransactionReconciliationController::class, 'report'])
+        ->middleware('permission:'.Permissions::TransactionReconView)
+        ->name('transaction-reconciliation.report');
+    Route::get('transaction-reconciliation/{transactionReconSession}/report/export', [TransactionReconciliationController::class, 'exportReport'])
+        ->middleware('permission:'.Permissions::TransactionReconView)
+        ->name('transaction-reconciliation.report.export');
+    Route::delete('transaction-reconciliation/{transactionReconSession}', [TransactionReconciliationController::class, 'destroy'])
+        ->middleware('permission:'.Permissions::TransactionReconManage)
+        ->name('transaction-reconciliation.destroy');
+
     Route::get('transaction-checker', [TransactionCheckerController::class, 'index'])
         ->middleware('permission:'.Permissions::TransactionCheckerView)
         ->name('transaction-checker.index');
@@ -311,6 +335,31 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::post('sql-queries/import', [SqlQueryController::class, 'import'])
         ->middleware('permission:'.Permissions::SqlQueriesManage)
         ->name('sql-queries.import');
+
+    Route::get('payload-composers', [PayloadComposerController::class, 'index'])
+        ->middleware('permission:'.Permissions::PayloadComposersView)
+        ->name('payload-composers.index');
+    Route::get('payload-composers/create', [PayloadComposerController::class, 'create'])
+        ->middleware('permission:'.Permissions::PayloadComposersManage)
+        ->name('payload-composers.create');
+    Route::post('payload-composers', [PayloadComposerController::class, 'store'])
+        ->middleware('permission:'.Permissions::PayloadComposersManage)
+        ->name('payload-composers.store');
+    Route::get('payload-composers/{payloadComposer}', [PayloadComposerController::class, 'show'])
+        ->middleware('permission:'.Permissions::PayloadComposersView)
+        ->name('payload-composers.show');
+    Route::get('payload-composers/{payloadComposer}/edit', [PayloadComposerController::class, 'edit'])
+        ->middleware('permission:'.Permissions::PayloadComposersManage)
+        ->name('payload-composers.edit');
+    Route::put('payload-composers/{payloadComposer}', [PayloadComposerController::class, 'update'])
+        ->middleware('permission:'.Permissions::PayloadComposersManage)
+        ->name('payload-composers.update');
+    Route::delete('payload-composers/{payloadComposer}', [PayloadComposerController::class, 'destroy'])
+        ->middleware('permission:'.Permissions::PayloadComposersManage)
+        ->name('payload-composers.destroy');
+    Route::post('payload-composers/{payloadComposer}/generate', [PayloadComposerController::class, 'generate'])
+        ->middleware('permission:'.Permissions::PayloadComposersManage)
+        ->name('payload-composers.generate');
 });
 
 require __DIR__.'/settings.php';

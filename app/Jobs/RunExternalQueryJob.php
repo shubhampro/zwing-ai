@@ -54,6 +54,8 @@ class RunExternalQueryJob implements ShouldQueue
                 ExternalQueryJobType::PullStock,
                 ExternalQueryJobType::PullStockZwing,
                 ExternalQueryJobType::PullStockErp,
+                ExternalQueryJobType::PullTransactionZwing,
+                ExternalQueryJobType::PullTransactionErp,
                 ExternalQueryJobType::SyncRow,
                 ExternalQueryJobType::LogDetails => throw new RuntimeException(
                     "Job type {$log->job_type->value} uses a dedicated job class.",
