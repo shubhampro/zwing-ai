@@ -54,4 +54,11 @@ class ExternalQueryLogFactory extends Factory
             'job_type' => ExternalQueryJobType::LogDetails,
         ]);
     }
+
+    public function qtySums(): static
+    {
+        return $this->state(fn (): array => [
+            'job_type' => ExternalQueryJobType::QtySums,
+        ]);
+    }
 }

@@ -6,10 +6,12 @@ use App\Enums\DatabaseConnectionType;
 use App\Enums\ExternalQueryJobType;
 use App\Enums\ExternalQueryStatus;
 use App\Http\Requests\StockReconLogDetailRequest;
+use App\Http\Requests\StockReconQtySumRequest;
 use App\Http\Requests\StoreStockReconciliationConnectionRequest;
 use App\Http\Requests\StoreStockReconciliationCsvRequest;
 use App\Http\Requests\SyncStockReconReportRowRequest;
 use App\Jobs\FetchStockReconLogDetailsJob;
+use App\Jobs\FetchStockReconQtySumsJob;
 use App\Jobs\ParseStockReconciliationCsv;
 use App\Jobs\PullErpStockFromConnectionJob;
 use App\Jobs\PullZwingStockFromConnectionJob;
@@ -357,6 +359,35 @@ class StockTransactionReconciliationController extends Controller
             siteCode: $request->siteCode(),
             icode: $request->icode(),
             batchNo: $request->batchNo(),
+            sprefcode: $request->sprefcode(),
+        );
+
+        return response()->json($log->fresh()?->toPollPayload() ?? $log->toPollPayload(), 202);
+    }
+
+    public function reportQtySums(
+        StockReconQtySumRequest $request,
+        StockReconSession $stockReconSession,
+    ): JsonResponse {
+        abort_unless(($stockReconSession->source ?? 'csv') === 'connection', 422);
+
+        $log = ExternalQueryLog::query()->create([
+            'user_id' => $request->user()->id,
+            'stock_recon_session_id' => $stockReconSession->id,
+            'job_type' => ExternalQueryJobType::QtySums,
+            'status' => ExternalQueryStatus::Pending,
+            'context' => [
+                'site_code' => $request->siteCode(),
+                'icode' => $request->icode(),
+                'sprefcode' => $request->sprefcode(),
+            ],
+        ]);
+
+        FetchStockReconQtySumsJob::dispatch(
+            externalQueryLogId: $log->id,
+            sessionId: $stockReconSession->id,
+            siteCode: $request->siteCode(),
+            icode: $request->icode(),
             sprefcode: $request->sprefcode(),
         );
 

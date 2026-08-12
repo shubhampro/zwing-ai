@@ -41,6 +41,7 @@ import { copyToClipboard } from '@/lib/copy-to-clipboard';
 import {
     exportMethod,
     logDetails,
+    qtySums,
     syncRow,
 } from '@/routes/stock-transaction-reconciliation/report';
 import { index, report, show } from '@/routes/stock-transaction-reconciliation';
@@ -90,6 +91,45 @@ type LogDetailResponse = {
     matched: { zwing: LogEntry[]; erp: LogEntry[] };
     mismatch: { zwing: LogEntry[]; erp: LogEntry[] };
 };
+
+type QtySumResponse = {
+    store_id: number | string;
+    stock_point_id: number | string;
+    sku_code: number | string;
+    stock_logs_qty_sum: number;
+    stock_point_summary_qty_sum: number;
+    query_ms: number;
+};
+
+function parseQtySumResult(value: unknown): QtySumResponse {
+    const raw =
+        typeof value === 'string'
+            ? (JSON.parse(value) as Record<string, unknown>)
+            : (value as Record<string, unknown> | null);
+
+    if (raw === null || typeof raw !== 'object') {
+        throw new Error('Invalid qty sum result.');
+    }
+
+    if (
+        raw.store_id === undefined ||
+        raw.stock_point_id === undefined ||
+        raw.sku_code === undefined
+    ) {
+        throw new Error('Qty sum result missing resolved ids.');
+    }
+
+    return {
+        store_id: raw.store_id as number | string,
+        stock_point_id: raw.stock_point_id as number | string,
+        sku_code: raw.sku_code as number | string,
+        stock_logs_qty_sum: Number(raw.stock_logs_qty_sum ?? 0),
+        stock_point_summary_qty_sum: Number(
+            raw.stock_point_summary_qty_sum ?? 0,
+        ),
+        query_ms: Number(raw.query_ms ?? 0),
+    };
+}
 
 type SyncRowResponse = {
     site_code: string;
@@ -246,7 +286,7 @@ async function copyText(text: string, label: string): Promise<void> {
     const copied = await copyToClipboard(text);
 
     if (copied) {
-        toast.success(`${label} copied`);
+        toast.success(`${label}: ${text}`);
     } else {
         toast.error('Could not copy to clipboard');
     }
@@ -511,6 +551,9 @@ export default function StockTransactionReconciliationReport({
         useState<LogDetailResponse | null>(null);
     const [logDetailsLoading, setLogDetailsLoading] = useState(false);
     const [logDetailsError, setLogDetailsError] = useState<string | null>(null);
+    const [qtySumData, setQtySumData] = useState<QtySumResponse | null>(null);
+    const [qtySumLoading, setQtySumLoading] = useState(false);
+    const [qtySumError, setQtySumError] = useState<string | null>(null);
 
     const [syncModalOpen, setSyncModalOpen] = useState(false);
     const [syncModalRow, setSyncModalRow] = useState<ReportRow | null>(null);
@@ -587,10 +630,66 @@ export default function StockTransactionReconciliationReport({
         [session.id],
     );
 
+    const loadQtySums = useCallback(
+        async (row: ReportRow) => {
+            setQtySumLoading(true);
+            setQtySumError(null);
+            setQtySumData(null);
+
+            const url = qtySums.url(session.id, {
+                query: {
+                    site_code: row.site_code,
+                    icode: row.icode,
+                    sprefcode: row.sprefcode,
+                },
+            });
+
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                });
+
+                if (!response.ok && response.status !== 202) {
+                    throw new Error('Failed to load qty sums.');
+                }
+
+                const payload = (await response.json()) as
+                    | QtySumResponse
+                    | Awaited<ReturnType<typeof waitForExternalQuery>>;
+
+                let data: QtySumResponse;
+
+                if (isExternalQueryPollPayload(payload)) {
+                    const settled =
+                        payload.status === 'completed'
+                            ? payload
+                            : await waitForExternalQuery(payload.id);
+                    data = parseQtySumResult(settled.result);
+                } else {
+                    data = parseQtySumResult(payload);
+                }
+
+                setQtySumData(data);
+            } catch {
+                setQtySumError('Could not load Zwing qty sums for this SKU.');
+            } finally {
+                setQtySumLoading(false);
+            }
+        },
+        [session.id],
+    );
+
     function openLogModal(row: ReportRow) {
         setSelectedRow(row);
         setLogModalTab('matched');
         setLogModalOpen(true);
+        setQtySumData(null);
+        setQtySumError(null);
+        setQtySumLoading(false);
         loadLogDetails(row);
     }
 
@@ -599,6 +698,9 @@ export default function StockTransactionReconciliationReport({
         setSelectedRow(null);
         setLogDetailsData(null);
         setLogDetailsError(null);
+        setQtySumData(null);
+        setQtySumError(null);
+        setQtySumLoading(false);
     }
 
     function openSyncModal(row: ReportRow) {
@@ -1432,6 +1534,87 @@ export default function StockTransactionReconciliationReport({
                             </div>
                         </DialogDescription>
                     </DialogHeader>
+
+                    {isConnection && session.zwing_file_name !== null && (
+                        <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="font-medium text-foreground">
+                                    Zwing qty sums
+                                </p>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={
+                                        qtySumLoading || selectedRow === null
+                                    }
+                                    onClick={() =>
+                                        selectedRow &&
+                                        void loadQtySums(selectedRow)
+                                    }
+                                >
+                                    {qtySumLoading ? (
+                                        <>
+                                            <Loader2 className="size-3.5 animate-spin" />
+                                            Loading…
+                                        </>
+                                    ) : qtySumData !== null ? (
+                                        'Reload sums'
+                                    ) : (
+                                        'Load sums'
+                                    )}
+                                </Button>
+                            </div>
+                            {qtySumError && (
+                                <p className="mt-1.5 text-destructive">
+                                    {qtySumError}
+                                </p>
+                            )}
+                            {qtySumData && (
+                                <div className="mt-1.5 space-y-1.5 text-muted-foreground">
+                                    <p>
+                                        stock_logs SUM:{' '}
+                                        <span className="font-medium tabular-nums text-foreground">
+                                            {qtySumData.stock_logs_qty_sum.toLocaleString()}
+                                        </span>
+                                        {' · '}
+                                        stock_point_summary SUM:{' '}
+                                        <span className="font-medium tabular-nums text-foreground">
+                                            {qtySumData.stock_point_summary_qty_sum.toLocaleString()}
+                                        </span>
+                                        {qtySumData.query_ms != null && (
+                                            <span className="text-xs">
+                                                {' '}
+                                                · {qtySumData.query_ms} ms
+                                            </span>
+                                        )}
+                                    </p>
+                                    <p className="text-xs">
+                                        store_id{' '}
+                                        <span className="font-mono font-medium text-foreground">
+                                            {String(qtySumData.store_id)}
+                                        </span>
+                                        {' · '}
+                                        stock_point_id{' '}
+                                        <span className="font-mono font-medium text-foreground">
+                                            {String(qtySumData.stock_point_id)}
+                                        </span>
+                                        {' · '}
+                                        sku_code{' '}
+                                        <span className="font-mono font-medium text-foreground">
+                                            {String(qtySumData.sku_code)}
+                                        </span>
+                                    </p>
+                                </div>
+                            )}
+                            {!qtySumData && !qtySumError && !qtySumLoading && (
+                                <p className="mt-1.5 text-xs text-muted-foreground">
+                                    Click Load sums for store_id + sku_code +
+                                    stock_point_id (no batch).
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     <div className="flex gap-2">
                         <Button

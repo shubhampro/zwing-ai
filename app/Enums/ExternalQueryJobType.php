@@ -11,6 +11,7 @@ enum ExternalQueryJobType: string
     case PullTransactionErp = 'pull_transaction_erp';
     case SyncRow = 'sync_row';
     case LogDetails = 'log_details';
+    case QtySums = 'qty_sums';
     case ListZwingVendors = 'list_zwing_vendors';
     case AttachZwingVendor = 'attach_zwing_vendor';
     case UpdateFromZwingVendor = 'update_from_zwing_vendor';
@@ -37,6 +38,7 @@ enum ExternalQueryJobType: string
             self::PullTransactionErp => 'Pull transaction (ERP)',
             self::SyncRow => 'Sync row',
             self::LogDetails => 'Log details',
+            self::QtySums => 'Qty sums',
             self::ListZwingVendors => 'List Zwing vendors',
             self::AttachZwingVendor => 'Attach Zwing vendor',
             self::UpdateFromZwingVendor => 'Update from Zwing vendor',

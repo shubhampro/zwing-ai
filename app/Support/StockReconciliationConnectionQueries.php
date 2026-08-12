@@ -79,6 +79,44 @@ WHERE stores.status = 1
   AND COALESCE(batch.batch_no, '') = ?
 SQL;
 
+    public const MYSQL_RESOLVE_STORE_ID = <<<'SQL'
+SELECT store_id
+FROM stores
+WHERE store_reference_code = ?
+LIMIT 1
+SQL;
+
+    public const MYSQL_RESOLVE_STOCK_POINT_ID = <<<'SQL'
+SELECT id
+FROM stock_points
+WHERE ref_stock_point_code = ?
+  AND store_id = ?
+LIMIT 1
+SQL;
+
+    public const MYSQL_RESOLVE_SKU_CODE = <<<'SQL'
+SELECT sku_code
+FROM im_sku_flat_table
+WHERE ref_item_code = ?
+LIMIT 1
+SQL;
+
+    public const MYSQL_STOCK_LOGS_QTY_SUM = <<<'SQL'
+SELECT COALESCE(SUM(qty), 0) AS qty_sum
+FROM stock_logs
+WHERE store_id = ?
+  AND stock_point_id = ?
+  AND sku_code = ?
+SQL;
+
+    public const MYSQL_STOCK_POINT_SUMMARY_QTY_SUM = <<<'SQL'
+SELECT COALESCE(SUM(qty), 0) AS qty_sum
+FROM stock_point_summary
+WHERE store_id = ?
+  AND stock_point_id = ?
+  AND sku_code = ?
+SQL;
+
     public const PGSQL_STOCK_ROW = <<<'SQL'
 SELECT
     lv.sitecode AS site_code,

@@ -209,6 +209,9 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::get('stock-transaction-reconciliation/{stockReconSession}/report/log-details', [StockTransactionReconciliationController::class, 'reportLogDetails'])
         ->middleware('permission:'.Permissions::StockReconView)
         ->name('stock-transaction-reconciliation.report.log-details');
+    Route::get('stock-transaction-reconciliation/{stockReconSession}/report/qty-sums', [StockTransactionReconciliationController::class, 'reportQtySums'])
+        ->middleware('permission:'.Permissions::StockReconView)
+        ->name('stock-transaction-reconciliation.report.qty-sums');
     Route::post('stock-transaction-reconciliation/{stockReconSession}/report/sync-row', [StockTransactionReconciliationController::class, 'syncReportRow'])
         ->middleware('permission:'.Permissions::StockReconManage)
         ->name('stock-transaction-reconciliation.report.sync-row');
