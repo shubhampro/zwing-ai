@@ -282,6 +282,8 @@ class TransactionReconciliationController extends Controller
                 COUNT(*) FILTER (WHERE match_status = 'matched') AS matched,
                 COUNT(*) FILTER (WHERE match_status = 'code_mismatch') AS code_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'type_mismatch') AS type_mismatch,
+                COUNT(*) FILTER (WHERE match_status = 'amount_mismatch') AS amount_mismatch,
+                COUNT(*) FILTER (WHERE match_status = 'date_mismatch') AS date_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'status_mismatch') AS status_mismatch,
                 COUNT(*) FILTER (WHERE match_status = 'packet_not_in_erp') AS zwing_only,
                 COUNT(*) FILTER (WHERE match_status = 'packet_not_in_zwing') AS erp_only,
@@ -300,10 +302,12 @@ class TransactionReconciliationController extends Controller
                 CASE match_status
                     WHEN 'code_mismatch' THEN 0
                     WHEN 'type_mismatch' THEN 1
-                    WHEN 'status_mismatch' THEN 2
-                    WHEN 'packet_not_in_erp' THEN 3
-                    WHEN 'packet_not_in_zwing' THEN 4
-                    ELSE 5
+                    WHEN 'amount_mismatch' THEN 2
+                    WHEN 'date_mismatch' THEN 3
+                    WHEN 'status_mismatch' THEN 4
+                    WHEN 'packet_not_in_erp' THEN 5
+                    WHEN 'packet_not_in_zwing' THEN 6
+                    ELSE 7
                 END,
                 code NULLS LAST,
                 txn_id
@@ -316,6 +320,7 @@ class TransactionReconciliationController extends Controller
                 ...$transactionReconSession->only(['id', 'name', 'v_id', 'status']),
                 'type' => $transactionReconSession->type->value,
                 'type_label' => $transactionReconSession->type->label(),
+                'uses_cash_columns' => $transactionReconSession->type->usesCashColumns(),
             ],
             'summary' => [
                 'total' => (int) ($summary->total ?? 0),
@@ -323,6 +328,8 @@ class TransactionReconciliationController extends Controller
                 'mismatch' => (int) ($summary->mismatch ?? 0),
                 'code_mismatch' => (int) ($summary->code_mismatch ?? 0),
                 'type_mismatch' => (int) ($summary->type_mismatch ?? 0),
+                'amount_mismatch' => (int) ($summary->amount_mismatch ?? 0),
+                'date_mismatch' => (int) ($summary->date_mismatch ?? 0),
                 'status_mismatch' => (int) ($summary->status_mismatch ?? 0),
                 'zwing_only' => (int) ($summary->zwing_only ?? 0),
                 'erp_only' => (int) ($summary->erp_only ?? 0),
@@ -383,10 +390,15 @@ class TransactionReconciliationController extends Controller
 
             fputcsv($handle, [
                 'txn_id',
+                'site_id',
                 'zwing_code',
                 'erp_code',
                 'zwing_type',
                 'erp_type',
+                'zwing_date',
+                'erp_date',
+                'zwing_amount',
+                'erp_amount',
                 'zwing_status',
                 'erp_status',
                 'match_status',
@@ -395,10 +407,15 @@ class TransactionReconciliationController extends Controller
             foreach ($rows as $row) {
                 fputcsv($handle, [
                     $row->txn_id,
+                    $row->site_id ?? '',
                     $row->zwing_code,
                     $row->erp_code,
                     $row->zwing_type,
                     $row->erp_type,
+                    $row->zwing_date ?? '',
+                    $row->erp_date ?? '',
+                    $row->zwing_amount ?? '',
+                    $row->erp_amount ?? '',
                     $row->zwing_status,
                     $row->erp_status,
                     $row->match_status,
@@ -474,7 +491,8 @@ class TransactionReconciliationController extends Controller
         }
 
         if ($codeQuery !== '') {
-            $clauses[] = '(txn_id ILIKE ? OR code ILIKE ? OR zwing_code ILIKE ? OR erp_code ILIKE ?)';
+            $clauses[] = '(txn_id ILIKE ? OR code ILIKE ? OR zwing_code ILIKE ? OR erp_code ILIKE ? OR site_id ILIKE ?)';
+            $params[] = "%{$codeQuery}%";
             $params[] = "%{$codeQuery}%";
             $params[] = "%{$codeQuery}%";
             $params[] = "%{$codeQuery}%";

@@ -8,6 +8,7 @@ enum TransactionReconType: string
     case Grn = 'grn';
     case Grt = 'grt';
     case Spt = 'spt';
+    case Cash = 'cash';
 
     public function label(): string
     {
@@ -16,7 +17,13 @@ enum TransactionReconType: string
             self::Grn => 'GRN',
             self::Grt => 'GRT',
             self::Spt => 'SPT',
+            self::Cash => 'CASH',
         };
+    }
+
+    public function usesCashColumns(): bool
+    {
+        return $this === self::Cash;
     }
 
     /**

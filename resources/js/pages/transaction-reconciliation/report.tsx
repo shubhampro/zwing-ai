@@ -26,6 +26,8 @@ type MatchStatus =
     | 'matched'
     | 'code_mismatch'
     | 'type_mismatch'
+    | 'amount_mismatch'
+    | 'date_mismatch'
     | 'status_mismatch'
     | 'packet_not_in_erp'
     | 'packet_not_in_zwing';
@@ -33,12 +35,17 @@ type MatchStatus =
 type ReportRow = {
     txn_id: string;
     code: string | null;
+    site_id: string | null;
     zwing_code: string | null;
     erp_code: string | null;
     zwing_type: string | null;
     erp_type: string | null;
     zwing_status: string | null;
     erp_status: string | null;
+    zwing_date: string | null;
+    erp_date: string | null;
+    zwing_amount: string | number | null;
+    erp_amount: string | number | null;
     match_status: MatchStatus;
 };
 
@@ -48,6 +55,8 @@ type Summary = {
     mismatch: number;
     code_mismatch: number;
     type_mismatch: number;
+    amount_mismatch: number;
+    date_mismatch: number;
     status_mismatch: number;
     zwing_only: number;
     erp_only: number;
@@ -71,7 +80,9 @@ type Props = {
         name: string;
         v_id: number;
         status: string;
+        type: string;
         type_label: string;
+        uses_cash_columns: boolean;
     };
     summary: Summary;
     rows: ReportRow[];
@@ -95,6 +106,8 @@ const statusConfig: Record<
     matched: { label: 'In both', variant: 'default' },
     code_mismatch: { label: 'Code mismatch', variant: 'destructive' },
     type_mismatch: { label: 'Type mismatch', variant: 'destructive' },
+    amount_mismatch: { label: 'Amount mismatch', variant: 'destructive' },
+    date_mismatch: { label: 'Date mismatch', variant: 'destructive' },
     status_mismatch: { label: 'Status mismatch', variant: 'destructive' },
     packet_not_in_erp: { label: 'Not found in ERP', variant: 'outline' },
     packet_not_in_zwing: { label: 'Not found in Zwing', variant: 'secondary' },
@@ -106,6 +119,8 @@ const filters: { value: string; label: string }[] = [
     { value: 'mismatch', label: 'All mismatches' },
     { value: 'code_mismatch', label: 'Code mismatch' },
     { value: 'type_mismatch', label: 'Type mismatch' },
+    { value: 'amount_mismatch', label: 'Amount mismatch' },
+    { value: 'date_mismatch', label: 'Date mismatch' },
     { value: 'status_mismatch', label: 'Status mismatch' },
     { value: 'zwing_only', label: 'Not in ERP' },
     { value: 'erp_only', label: 'Not in Zwing' },
@@ -201,6 +216,34 @@ function CopyIconButton({ text, label }: { text: string; label: string }) {
     );
 }
 
+function formatDate(value: string | null): string {
+    if (!value) {
+        return '—';
+    }
+
+    return new Date(value).toLocaleDateString(undefined, {
+        dateStyle: 'medium',
+    });
+}
+
+function formatAmount(value: string | number | null): string {
+    if (value === null || value === '') {
+        return '—';
+    }
+
+    const numeric = typeof value === 'number' ? value : Number(value);
+
+    return Number.isNaN(numeric) ? String(value) : numeric.toLocaleString();
+}
+
+function amountAsString(value: string | number | null): string | null {
+    if (value === null || value === '') {
+        return null;
+    }
+
+    return String(value);
+}
+
 function CompareValue({
     value,
     copyLabel,
@@ -220,7 +263,13 @@ function CompareValue({
     );
 }
 
-function ComparisonRow({ row }: { row: ReportRow }) {
+function ComparisonRow({
+    row,
+    showCashColumns,
+}: {
+    row: ReportRow;
+    showCashColumns: boolean;
+}) {
     const { label, variant } = statusConfig[row.match_status];
 
     return (
@@ -252,6 +301,36 @@ function ComparisonRow({ row }: { row: ReportRow }) {
             >
                 {row.zwing_type ?? '—'}
             </td>
+            {showCashColumns && (
+                <>
+                    <td
+                        className={cn(
+                            'px-3 py-3 align-middle',
+                            ZWING_CELL,
+                            compareCellClass(
+                                row.zwing_date,
+                                row.erp_date,
+                                'zwing',
+                            ),
+                        )}
+                    >
+                        {formatDate(row.zwing_date)}
+                    </td>
+                    <td
+                        className={cn(
+                            'px-3 py-3 align-middle font-mono text-xs',
+                            ZWING_CELL,
+                            compareCellClass(
+                                amountAsString(row.zwing_amount),
+                                amountAsString(row.erp_amount),
+                                'zwing',
+                            ),
+                        )}
+                    >
+                        {formatAmount(row.zwing_amount)}
+                    </td>
+                </>
+            )}
             <td
                 className={cn(
                     'px-3 py-3 align-middle',
@@ -280,6 +359,36 @@ function ComparisonRow({ row }: { row: ReportRow }) {
             >
                 {row.erp_type ?? '—'}
             </td>
+            {showCashColumns && (
+                <>
+                    <td
+                        className={cn(
+                            'px-3 py-3 align-middle',
+                            ERP_CELL,
+                            compareCellClass(
+                                row.zwing_date,
+                                row.erp_date,
+                                'erp',
+                            ),
+                        )}
+                    >
+                        {formatDate(row.erp_date)}
+                    </td>
+                    <td
+                        className={cn(
+                            'px-3 py-3 align-middle font-mono text-xs',
+                            ERP_CELL,
+                            compareCellClass(
+                                amountAsString(row.zwing_amount),
+                                amountAsString(row.erp_amount),
+                                'erp',
+                            ),
+                        )}
+                    >
+                        {formatAmount(row.erp_amount)}
+                    </td>
+                </>
+            )}
             <td
                 className={cn(
                     'px-3 py-3 align-middle',
@@ -449,6 +558,20 @@ export default function TransactionReconciliationReport({
                         value={summary.code_mismatch}
                         color="text-amber-600 dark:text-amber-400"
                     />
+                    {session.uses_cash_columns && (
+                        <>
+                            <SummaryCard
+                                label="Amount mismatch"
+                                value={summary.amount_mismatch}
+                                color="text-amber-600 dark:text-amber-400"
+                            />
+                            <SummaryCard
+                                label="Date mismatch"
+                                value={summary.date_mismatch}
+                                color="text-amber-600 dark:text-amber-400"
+                            />
+                        </>
+                    )}
                     <SummaryCard
                         label="Not in ERP"
                         value={summary.zwing_only}
@@ -549,7 +672,19 @@ export default function TransactionReconciliationReport({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    {filters.map((item) => (
+                    {filters
+                        .filter((item) => {
+                            if (
+                                !session.uses_cash_columns &&
+                                (item.value === 'amount_mismatch' ||
+                                    item.value === 'date_mismatch')
+                            ) {
+                                return false;
+                            }
+
+                            return true;
+                        })
+                        .map((item) => (
                         <Button
                             key={item.value}
                             variant={
@@ -610,10 +745,20 @@ export default function TransactionReconciliationReport({
                                     >
                                         Txn id
                                     </th>
-                                    <th colSpan={3} className={ZWING_HEAD}>
+                                    <th
+                                        colSpan={
+                                            session.uses_cash_columns ? 5 : 3
+                                        }
+                                        className={ZWING_HEAD}
+                                    >
                                         Zwing
                                     </th>
-                                    <th colSpan={3} className={ERP_HEAD}>
+                                    <th
+                                        colSpan={
+                                            session.uses_cash_columns ? 5 : 3
+                                        }
+                                        className={ERP_HEAD}
+                                    >
                                         ERP
                                     </th>
                                 </tr>
@@ -632,8 +777,30 @@ export default function TransactionReconciliationReport({
                                             ZWING_CELL,
                                         )}
                                     >
-                                        Type
+                                        {session.uses_cash_columns
+                                            ? 'Site'
+                                            : 'Type'}
                                     </th>
+                                    {session.uses_cash_columns && (
+                                        <>
+                                            <th
+                                                className={cn(
+                                                    'px-3 py-2 font-medium',
+                                                    ZWING_CELL,
+                                                )}
+                                            >
+                                                Date
+                                            </th>
+                                            <th
+                                                className={cn(
+                                                    'px-3 py-2 font-medium',
+                                                    ZWING_CELL,
+                                                )}
+                                            >
+                                                Amount
+                                            </th>
+                                        </>
+                                    )}
                                     <th
                                         className={cn(
                                             'px-3 py-2 font-medium',
@@ -656,8 +823,30 @@ export default function TransactionReconciliationReport({
                                             ERP_CELL,
                                         )}
                                     >
-                                        Type
+                                        {session.uses_cash_columns
+                                            ? 'Site'
+                                            : 'Type'}
                                     </th>
+                                    {session.uses_cash_columns && (
+                                        <>
+                                            <th
+                                                className={cn(
+                                                    'px-3 py-2 font-medium',
+                                                    ERP_CELL,
+                                                )}
+                                            >
+                                                Date
+                                            </th>
+                                            <th
+                                                className={cn(
+                                                    'px-3 py-2 font-medium',
+                                                    ERP_CELL,
+                                                )}
+                                            >
+                                                Amount
+                                            </th>
+                                        </>
+                                    )}
                                     <th
                                         className={cn(
                                             'px-3 py-2 font-medium',
@@ -672,7 +861,11 @@ export default function TransactionReconciliationReport({
                                 {rows.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={8}
+                                            colSpan={
+                                                session.uses_cash_columns
+                                                    ? 12
+                                                    : 8
+                                            }
                                             className="px-4 py-10 text-center text-sm text-muted-foreground"
                                         >
                                             No rows found for the selected
@@ -684,6 +877,9 @@ export default function TransactionReconciliationReport({
                                     <ComparisonRow
                                         key={`${row.txn_id}-${row.match_status}-${index}`}
                                         row={row}
+                                        showCashColumns={
+                                            session.uses_cash_columns
+                                        }
                                     />
                                 ))}
                             </tbody>

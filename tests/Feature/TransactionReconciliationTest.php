@@ -64,12 +64,14 @@ test('authenticated users can visit create page', function () {
             ->has('organizations', 1)
             ->where('organizations.0.vendor_id', 321)
             ->has('organizations.0.pgsql_connections', 1)
-            ->has('types', 4)
+            ->has('types', 5)
             ->where('types.0.key', 'packet')
             ->where('types.0.available', true)
             ->where('types.2.key', 'grt')
             ->where('types.2.available', true)
-            ->where('types.1.available', false));
+            ->where('types.1.available', false)
+            ->where('types.4.key', 'cash')
+            ->where('types.4.available', true));
 });
 
 test('packet pull creates session and chains zwing then erp jobs', function () {
@@ -201,6 +203,53 @@ test('grt pull creates session and chains zwing then erp jobs', function () {
     ]);
 });
 
+test('cash pull creates session and chains zwing then erp jobs', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $organization = Organization::factory()->create([
+        'vendor_id' => 888,
+        'db_name' => 'zw_mn_888_demo',
+    ]);
+    $pgsql = OrganizationDatabaseConnection::factory()->pgsql()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('transaction-reconciliation.store'), [
+            'name' => 'Live cash pull',
+            'type' => 'cash',
+            'organization_id' => $organization->id,
+            'pgsql_connection_id' => $pgsql->id,
+            'include_zwing' => true,
+            'include_erp' => true,
+        ])
+        ->assertRedirect();
+
+    $session = TransactionReconSession::query()->where('user_id', $user->id)->firstOrFail();
+
+    expect($session->name)->toBe('Live cash pull')
+        ->and($session->type)->toBe(TransactionReconType::Cash)
+        ->and($session->status)->toBe('pending');
+
+    Bus::assertChained([
+        new PullZwingTransactionFromConnectionJob(
+            sessionId: $session->id,
+            externalQueryLogId: (int) ExternalQueryLog::query()
+                ->where('job_type', ExternalQueryJobType::PullTransactionZwing)
+                ->value('id'),
+            completeSession: false,
+        ),
+        new PullErpTransactionFromConnectionJob(
+            sessionId: $session->id,
+            pgsqlConnectionId: $pgsql->id,
+            externalQueryLogId: (int) ExternalQueryLog::query()
+                ->where('job_type', ExternalQueryJobType::PullTransactionErp)
+                ->value('id'),
+        ),
+    ]);
+});
+
 test('report matches packet rows on txn id', function () {
     $user = User::factory()->create();
     $session = TransactionReconSession::factory()->for($user)->completed()->create();
@@ -259,6 +308,50 @@ test('report matches packet rows on txn id', function () {
             ->where('summary.total', 3)
             ->has('statusOptions.zwing')
             ->has('statusOptions.erp'));
+});
+
+test('report flags cash amount mismatch', function () {
+    $user = User::factory()->create();
+    $session = TransactionReconSession::factory()->for($user)->completed()->create([
+        'type' => TransactionReconType::Cash,
+    ]);
+
+    DB::table('zwing_transaction_reconsile')->insert([
+        'session_id' => $session->id,
+        'txn_id' => '101|CASH-1',
+        'code' => 'CASH-1',
+        'type' => '101',
+        'status' => 'APPROVED',
+        'site_id' => '101',
+        'txn_date' => '2026-06-01',
+        'amount' => 100,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('erp_transaction_reconsile')->insert([
+        'session_id' => $session->id,
+        'txn_id' => '101|CASH-1',
+        'code' => 'CASH-1',
+        'type' => '101',
+        'status' => 'APPROVED',
+        'site_id' => '101',
+        'txn_date' => '2026-06-01',
+        'amount' => 120,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('transaction-reconciliation.report', $session))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('transaction-reconciliation/report')
+            ->where('session.uses_cash_columns', true)
+            ->where('summary.amount_mismatch', 1)
+            ->where('summary.matched', 0)
+            ->where('summary.mismatch', 1)
+            ->where('rows.0.match_status', 'amount_mismatch'));
 });
 
 test('report export streams csv', function () {
