@@ -98,10 +98,48 @@ WHERE hd.fname LIKE '%ZPOS%'
   AND enttype = 'PJN'
 SQL;
 
+    /**
+     * Deposit / refund CN docs from Zwing, matched to ERP POS journals by doc_no.
+     */
+    public const MYSQL_DEPOSIT = <<<'SQL'
+SELECT
+    doc_no AS txn_id,
+    doc_no AS code,
+    'DEPOSIT' AS type,
+    status AS status
+FROM dep_rfd_trans
+WHERE status = 'Success'
+  AND trans_src IN ('Order', 'self')
+  AND trans_sub_type IN ('Credit-Note', 'Refund-CN', 'Deposit-DN')
+  AND doc_no IS NOT NULL
+  AND doc_no != ''
+SQL;
+
+    public const PGSQL_DEPOSIT = <<<'SQL'
+SELECT
+    scheme_docno AS txn_id,
+    scheme_docno AS code,
+    'DEPOSIT' AS type,
+    'Success' AS status
+FROM finpost
+LEFT JOIN main.hrdemp hd ON hd.ecode = finpost.release_ecode
+WHERE hd.fname LIKE '%ZPOS%'
+  AND scheme_docno IS NOT NULL
+  AND scheme_docno <> ''
+  AND enttype = 'PJN'
+  AND (
+    scheme_docno LIKE 'DEP%'
+    OR scheme_docno LIKE 'DEPB%'
+  )
+SQL;
+
     public static function isAvailable(TransactionReconType $type): bool
     {
         return match ($type) {
-            TransactionReconType::Packet, TransactionReconType::Grt, TransactionReconType::Cash => true,
+            TransactionReconType::Packet,
+            TransactionReconType::Grt,
+            TransactionReconType::Cash,
+            TransactionReconType::Deposit => true,
             default => false,
         };
     }
@@ -112,6 +150,7 @@ SQL;
             TransactionReconType::Packet => self::MYSQL_PACKET,
             TransactionReconType::Grt => self::MYSQL_GRT,
             TransactionReconType::Cash => self::MYSQL_CASH,
+            TransactionReconType::Deposit => self::MYSQL_DEPOSIT,
             default => throw new RuntimeException("Zwing query not configured for {$type->value}."),
         };
     }
@@ -122,6 +161,7 @@ SQL;
             TransactionReconType::Packet => self::PGSQL_PACKET,
             TransactionReconType::Grt => self::PGSQL_GRT,
             TransactionReconType::Cash => self::PGSQL_CASH,
+            TransactionReconType::Deposit => self::PGSQL_DEPOSIT,
             default => throw new RuntimeException("ERP query not configured for {$type->value}."),
         };
     }

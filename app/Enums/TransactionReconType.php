@@ -9,6 +9,7 @@ enum TransactionReconType: string
     case Grt = 'grt';
     case Spt = 'spt';
     case Cash = 'cash';
+    case Deposit = 'deposit';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum TransactionReconType: string
             self::Grt => 'GRT',
             self::Spt => 'SPT',
             self::Cash => 'CASH',
+            self::Deposit => 'Deposit',
         };
     }
 

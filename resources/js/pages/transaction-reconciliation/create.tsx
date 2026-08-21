@@ -209,7 +209,7 @@ export default function TransactionReconciliationCreate({
                                     disabled={!hasOrganization}
                                 >
                                     <SelectTrigger className="h-11">
-                                        <SelectValue placeholder="Packet / GRN / GRT / SPT / CASH" />
+                                        <SelectValue placeholder="Packet / GRN / GRT / SPT / CASH / Deposit" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {types.map((type) => (

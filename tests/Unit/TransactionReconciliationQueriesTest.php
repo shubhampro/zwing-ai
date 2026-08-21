@@ -51,3 +51,24 @@ test('cash queries map site, doc, date, amount, and status without date range', 
         ->not->toContain('between')
         ->and(TransactionReconciliationQueries::isAvailable(TransactionReconType::Cash))->toBeTrue();
 });
+
+test('deposit queries filter dep_rfd_trans and match erp finpost by doc_no', function () {
+    $zwing = TransactionReconciliationQueries::mysql(TransactionReconType::Deposit);
+    $erp = TransactionReconciliationQueries::pgsql(TransactionReconType::Deposit);
+
+    expect($zwing)
+        ->toContain('doc_no AS txn_id')
+        ->toContain('doc_no AS code')
+        ->toContain('FROM dep_rfd_trans')
+        ->toContain("status = 'Success'")
+        ->toContain("trans_src IN ('Order', 'self')")
+        ->toContain("trans_sub_type IN ('Credit-Note', 'Refund-CN', 'Deposit-DN')")
+        ->and($erp)
+        ->toContain('scheme_docno AS txn_id')
+        ->toContain('scheme_docno AS code')
+        ->toContain("'Success' AS status")
+        ->toContain('FROM finpost')
+        ->toContain("enttype = 'PJN'")
+        ->toContain("scheme_docno LIKE 'DEP%'")
+        ->and(TransactionReconciliationQueries::isAvailable(TransactionReconType::Deposit))->toBeTrue();
+});

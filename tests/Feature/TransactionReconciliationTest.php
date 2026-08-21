@@ -64,14 +64,16 @@ test('authenticated users can visit create page', function () {
             ->has('organizations', 1)
             ->where('organizations.0.vendor_id', 321)
             ->has('organizations.0.pgsql_connections', 1)
-            ->has('types', 5)
+            ->has('types', 6)
             ->where('types.0.key', 'packet')
             ->where('types.0.available', true)
             ->where('types.2.key', 'grt')
             ->where('types.2.available', true)
             ->where('types.1.available', false)
             ->where('types.4.key', 'cash')
-            ->where('types.4.available', true));
+            ->where('types.4.available', true)
+            ->where('types.5.key', 'deposit')
+            ->where('types.5.available', true));
 });
 
 test('packet pull creates session and chains zwing then erp jobs', function () {
@@ -154,6 +156,53 @@ test('grn type is rejected until queries exist', function () {
             'include_erp' => false,
         ])
         ->assertSessionHasErrors('type');
+});
+
+test('deposit pull creates session and chains zwing then erp jobs', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $organization = Organization::factory()->create([
+        'vendor_id' => 888,
+        'db_name' => 'zw_mn_888_demo',
+    ]);
+    $pgsql = OrganizationDatabaseConnection::factory()->pgsql()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('transaction-reconciliation.store'), [
+            'name' => 'Live deposit pull',
+            'type' => 'deposit',
+            'organization_id' => $organization->id,
+            'pgsql_connection_id' => $pgsql->id,
+            'include_zwing' => true,
+            'include_erp' => true,
+        ])
+        ->assertRedirect();
+
+    $session = TransactionReconSession::query()->where('user_id', $user->id)->firstOrFail();
+
+    expect($session->name)->toBe('Live deposit pull')
+        ->and($session->type)->toBe(TransactionReconType::Deposit)
+        ->and($session->status)->toBe('pending');
+
+    Bus::assertChained([
+        new PullZwingTransactionFromConnectionJob(
+            sessionId: $session->id,
+            externalQueryLogId: (int) ExternalQueryLog::query()
+                ->where('job_type', ExternalQueryJobType::PullTransactionZwing)
+                ->value('id'),
+            completeSession: false,
+        ),
+        new PullErpTransactionFromConnectionJob(
+            sessionId: $session->id,
+            pgsqlConnectionId: $pgsql->id,
+            externalQueryLogId: (int) ExternalQueryLog::query()
+                ->where('job_type', ExternalQueryJobType::PullTransactionErp)
+                ->value('id'),
+        ),
+    ]);
 });
 
 test('grt pull creates session and chains zwing then erp jobs', function () {
