@@ -30,7 +30,8 @@ SELECT
     SUM(s.netpayable) AS total_amount,
     'Success' AS status
 FROM salcsmain s
-WHERE s.release_ecode = 62998
+LEFT JOIN main.hrdemp hd ON hd.ecode = s.release_ecode
+WHERE hd.fname LIKE '%ZPOS%'
   AND DATE(s.csdate) BETWEEN ? AND ?
 GROUP BY
     s.scheme_docno
@@ -43,7 +44,8 @@ SELECT
     SUM(ss.netpayable) AS total_amount,
     'Success' AS status
 FROM salssmain ss
-WHERE ss.last_access_ecode = 62998
+LEFT JOIN main.hrdemp hd ON hd.ecode = ss.last_access_ecode
+WHERE hd.fname LIKE '%ZPOS%'
   AND DATE(ss.ssdate) BETWEEN ? AND ?
 GROUP BY
     ss.scheme_docno
@@ -56,13 +58,15 @@ SELECT
     SUM(sd.netpayable) AS total_amount,
     'Void' AS status
 FROM salcsmain_deleted sd
-WHERE sd.release_ecode = 62998
+LEFT JOIN main.hrdemp hd ON hd.ecode = sd.release_ecode
+WHERE hd.fname LIKE '%ZPOS%'
   AND DATE(sd.csdate) BETWEEN ? AND ?
   AND NOT EXISTS (
       SELECT 1
       FROM salcsmain s
-      WHERE s.scheme_docno = sd.scheme_docno
-        AND s.release_ecode = 62998
+      LEFT JOIN main.hrdemp hd ON hd.ecode = s.release_ecode
+      WHERE hd.fname LIKE '%ZPOS%'
+        AND s.scheme_docno = sd.scheme_docno
         AND DATE(s.csdate) BETWEEN ? AND ?
   )
 GROUP BY
