@@ -9,6 +9,8 @@ enum ExternalQueryJobType: string
     case PullStockErp = 'pull_stock_erp';
     case PullTransactionZwing = 'pull_transaction_zwing';
     case PullTransactionErp = 'pull_transaction_erp';
+    case PullInvoiceZwing = 'pull_invoice_zwing';
+    case PullInvoiceErp = 'pull_invoice_erp';
     case SyncRow = 'sync_row';
     case LogDetails = 'log_details';
     case QtySums = 'qty_sums';
@@ -36,6 +38,8 @@ enum ExternalQueryJobType: string
             self::PullStockErp => 'Pull stock (ERP)',
             self::PullTransactionZwing => 'Pull transaction (Zwing)',
             self::PullTransactionErp => 'Pull transaction (ERP)',
+            self::PullInvoiceZwing => 'Pull invoice (Zwing)',
+            self::PullInvoiceErp => 'Pull invoice (ERP)',
             self::SyncRow => 'Sync row',
             self::LogDetails => 'Log details',
             self::QtySums => 'Qty sums',

@@ -2,18 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DatabaseConnectionType;
+use App\Enums\ExternalQueryJobType;
+use App\Enums\ExternalQueryStatus;
+use App\Http\Requests\StoreInvoiceReconciliationConnectionRequest;
 use App\Http\Requests\StoreInvoiceReconciliationCsvRequest;
 use App\Jobs\ParseInvoiceReconciliationCsv;
+use App\Jobs\PullErpInvoiceFromConnectionJob;
+use App\Jobs\PullZwingInvoiceFromConnectionJob;
+use App\Models\ExternalQueryLog;
 use App\Models\InvoiceReconSession;
+use App\Models\Organization;
+use App\Models\OrganizationDatabaseConnection;
 use App\Models\User;
+use App\Support\DatabaseHost;
+use App\Support\ExternalQueryQueue;
 use App\Support\InvoiceReconciliationComparison;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class InvoiceReconciliationController extends Controller
 {
@@ -46,7 +60,147 @@ class InvoiceReconciliationController extends Controller
     {
         abort_if($request->user() === null, 403);
 
-        return Inertia::render('invoice-reconciliation/create');
+        $organizations = Organization::query()
+            ->whereNotNull('db_name')
+            ->with(['databaseConnections' => fn ($query) => $query
+                ->active()
+                ->ofType(DatabaseConnectionType::Pgsql)
+                ->orderBy('type')])
+            ->orderBy('name')
+            ->get(['id', 'name', 'ba_code', 'vendor_id', 'db_name']);
+
+        $organizationPayload = $organizations
+            ->map(fn (Organization $organization) => [
+                'id' => $organization->id,
+                'name' => $organization->name,
+                'ba_code' => $organization->ba_code,
+                'vendor_id' => $organization->vendor_id,
+                'has_db_name' => filled($organization->db_name),
+                'pgsql_connections' => $organization->databaseConnections
+                    ->map(fn (OrganizationDatabaseConnection $connection) => [
+                        'id' => $connection->id,
+                        'type' => $connection->type->value,
+                        'host_masked' => DatabaseHost::mask($connection->host),
+                        'is_active' => $connection->is_active,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+
+        return Inertia::render('invoice-reconciliation/create', [
+            'organizations' => $organizationPayload,
+        ]);
+    }
+
+    public function storeFromConnections(StoreInvoiceReconciliationConnectionRequest $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        /** @var Organization $organization */
+        $organization = Organization::query()->findOrFail($request->integer('organization_id'));
+
+        $includeZwing = $request->boolean('include_zwing');
+        $includeErp = $request->boolean('include_erp');
+        $pgsqlConnectionId = $request->integer('pgsql_connection_id') ?: null;
+        $dateFrom = $request->date('date_from')?->toDateString();
+        $dateTo = $request->date('date_to')?->toDateString();
+
+        $sessionName = $request->string('name')->trim()->toString();
+
+        if ($sessionName === '') {
+            $sessionName = sprintf(
+                '%s · Invoice · %s to %s · %s',
+                $organization->name,
+                $dateFrom,
+                $dateTo,
+                now()->format('Y-m-d h:i A'),
+            );
+        }
+
+        $session = InvoiceReconSession::query()->create([
+            'user_id' => $user->id,
+            'name' => $sessionName,
+            'v_id' => $organization->vendor_id,
+            'source' => 'connection',
+            'organization_id' => $organization->id,
+            'pgsql_connection_id' => $pgsqlConnectionId,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'zwing_file_name' => $includeZwing ? 'mysql_ssh' : null,
+            'erp_file_name' => $includeErp ? 'pgsql connection' : null,
+            'zwing_row_count' => null,
+            'erp_row_count' => null,
+            'status' => 'pending',
+        ]);
+
+        $jobs = [];
+
+        if ($includeZwing) {
+            $zwingLog = ExternalQueryLog::query()->create([
+                'user_id' => $user->id,
+                'job_type' => ExternalQueryJobType::PullInvoiceZwing,
+                'status' => ExternalQueryStatus::Pending,
+                'context' => [
+                    'side' => 'zwing',
+                    'invoice_recon_session_id' => $session->id,
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                ],
+            ]);
+
+            $jobs[] = new PullZwingInvoiceFromConnectionJob(
+                sessionId: $session->id,
+                externalQueryLogId: $zwingLog->id,
+                completeSession: ! $includeErp,
+            );
+        }
+
+        if ($includeErp) {
+            $erpLog = ExternalQueryLog::query()->create([
+                'user_id' => $user->id,
+                'job_type' => ExternalQueryJobType::PullInvoiceErp,
+                'status' => ExternalQueryStatus::Pending,
+                'context' => [
+                    'side' => 'erp',
+                    'invoice_recon_session_id' => $session->id,
+                    'pgsql_connection_id' => $pgsqlConnectionId,
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                ],
+            ]);
+
+            $jobs[] = new PullErpInvoiceFromConnectionJob(
+                sessionId: $session->id,
+                pgsqlConnectionId: (int) $pgsqlConnectionId,
+                externalQueryLogId: $erpLog->id,
+            );
+        }
+
+        $sessionId = $session->id;
+
+        Bus::chain($jobs)
+            ->onQueue(ExternalQueryQueue::NAME)
+            ->catch(function (Throwable $exception) use ($sessionId): void {
+                $message = preg_replace(
+                    '/Database:\s*[^,]*/i',
+                    'Database: [hidden]',
+                    $exception->getMessage(),
+                ) ?? $exception->getMessage();
+
+                InvoiceReconSession::query()
+                    ->where('id', $sessionId)
+                    ->where('status', '!=', 'failed')
+                    ->update([
+                        'status' => 'failed',
+                        'failure_reason' => Str::limit($message, 2000),
+                    ]);
+            })
+            ->dispatch();
+
+        return redirect()->route('invoice-reconciliation.show', $session);
     }
 
     public function show(Request $request, InvoiceReconSession $invoiceReconSession): Response
@@ -55,22 +209,30 @@ class InvoiceReconciliationController extends Controller
         abort_if($invoiceReconSession->user_id !== $request->user()->id, 403);
 
         return Inertia::render('invoice-reconciliation/show', [
-            'session' => $invoiceReconSession->only([
-                'id',
-                'name',
-                'v_id',
-                'zwing_file_name',
-                'erp_file_name',
-                'zwing_row_count',
-                'erp_row_count',
-                'zwing_processed_rows',
-                'erp_processed_rows',
-                'zwing_skipped_rows',
-                'erp_skipped_rows',
-                'status',
-                'reconciled_at',
-                'created_at',
-            ]),
+            'session' => [
+                ...$invoiceReconSession->only([
+                    'id',
+                    'name',
+                    'v_id',
+                    'source',
+                    'zwing_file_name',
+                    'erp_file_name',
+                    'zwing_row_count',
+                    'erp_row_count',
+                    'zwing_processed_rows',
+                    'erp_processed_rows',
+                    'zwing_skipped_rows',
+                    'erp_skipped_rows',
+                    'zwing_query_ms',
+                    'erp_query_ms',
+                    'status',
+                    'failure_reason',
+                    'reconciled_at',
+                    'created_at',
+                ]),
+                'date_from' => $invoiceReconSession->date_from?->toDateString(),
+                'date_to' => $invoiceReconSession->date_to?->toDateString(),
+            ],
         ]);
     }
 
@@ -251,6 +413,7 @@ class InvoiceReconciliationController extends Controller
             'user_id' => $user->id,
             'name' => $request->string('name')->toString(),
             'v_id' => $request->integer('v_id'),
+            'source' => 'csv',
             'zwing_file_name' => $zwing?->getClientOriginalName(),
             'erp_file_name' => $erp?->getClientOriginalName(),
             'zwing_row_count' => $zwingRowCount,

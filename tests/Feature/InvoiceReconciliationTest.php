@@ -56,7 +56,8 @@ test('authenticated users can visit the new reconciliation page', function () {
     $this->get(route('invoice-reconciliation.create'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('invoice-reconciliation/create'));
+            ->component('invoice-reconciliation/create')
+            ->has('organizations'));
 });
 
 test('authenticated users can view a session show page', function () {

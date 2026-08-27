@@ -268,6 +268,9 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::get('invoice-reconciliation/create', [InvoiceReconciliationController::class, 'create'])
         ->middleware('permission:'.Permissions::InvoiceReconManage)
         ->name('invoice-reconciliation.create');
+    Route::post('invoice-reconciliation/connections', [InvoiceReconciliationController::class, 'storeFromConnections'])
+        ->middleware('permission:'.Permissions::InvoiceReconManage)
+        ->name('invoice-reconciliation.connections');
     Route::post('invoice-reconciliation/csv', [InvoiceReconciliationController::class, 'uploadCsv'])
         ->middleware('permission:'.Permissions::InvoiceReconManage)
         ->name('invoice-reconciliation.csv');

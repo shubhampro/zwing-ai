@@ -56,6 +56,8 @@ class RunExternalQueryJob implements ShouldQueue
                 ExternalQueryJobType::PullStockErp,
                 ExternalQueryJobType::PullTransactionZwing,
                 ExternalQueryJobType::PullTransactionErp,
+                ExternalQueryJobType::PullInvoiceZwing,
+                ExternalQueryJobType::PullInvoiceErp,
                 ExternalQueryJobType::SyncRow,
                 ExternalQueryJobType::LogDetails,
                 ExternalQueryJobType::QtySums => throw new RuntimeException(

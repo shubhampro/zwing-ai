@@ -27,6 +27,9 @@ type SessionData = {
     id: number;
     name: string;
     v_id: number;
+    source: string | null;
+    date_from: string | null;
+    date_to: string | null;
     zwing_file_name: string | null;
     erp_file_name: string | null;
     zwing_row_count: number | null;
@@ -35,7 +38,10 @@ type SessionData = {
     erp_processed_rows: number;
     zwing_skipped_rows: number;
     erp_skipped_rows: number;
+    zwing_query_ms: number | null;
+    erp_query_ms: number | null;
     status: SessionStatus;
+    failure_reason: string | null;
     reconciled_at: string | null;
     created_at: string;
 };
@@ -179,6 +185,12 @@ export default function InvoiceReconciliationShow({
                             </h1>
                             <p className="mt-0.5 text-xs text-muted-foreground">
                                 Vendor ID: {session.v_id}
+                                {session.source === 'connection'
+                                    ? ' · Connection'
+                                    : ' · CSV'}
+                                {session.date_from && session.date_to
+                                    ? ` · ${session.date_from} to ${session.date_to}`
+                                    : ''}
                             </p>
                             <p className="mt-1 text-sm text-muted-foreground">
                                 {session.status === 'pending' &&
@@ -188,7 +200,8 @@ export default function InvoiceReconciliationShow({
                                 {session.status === 'completed' &&
                                     `Completed at ${new Date(session.reconciled_at!).toLocaleString()}`}
                                 {session.status === 'failed' &&
-                                    'Processing failed. Please try uploading again.'}
+                                    (session.failure_reason ??
+                                        'Processing failed. Please try again.')}
                             </p>
                         </div>
                     </div>
