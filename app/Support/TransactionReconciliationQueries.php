@@ -44,7 +44,7 @@ SELECT
     status
 FROM grn
 WHERE status IN ('posted', 'void')
-  AND ref_doc_no IS NULL
+  AND (ref_doc_no IS NULL OR ref_doc_no = '')
 SQL;
 
     public const MYSQL_GRN_HEADERS = <<<'SQL'
@@ -55,7 +55,7 @@ SELECT
     status
 FROM grn_headers
 WHERE status IN ('Complete', 'Void')
-  AND ref_doc_no IS NULL
+  AND (ref_doc_no IS NULL OR ref_doc_no = '')
 SQL;
 
     public const PGSQL_GRN = <<<'SQL'
