@@ -36,6 +36,35 @@ FROM psite_packet
 WHERE intgrefid IS NOT NULL
 SQL;
 
+    public const MYSQL_GRN = <<<'SQL'
+SELECT
+    grn_no AS txn_id,
+    grn_no AS code,
+    DATE(created_at) AS date,
+    status
+FROM grn
+WHERE status IN ('posted', 'void')
+SQL;
+
+    public const MYSQL_GRN_HEADERS = <<<'SQL'
+SELECT
+    grn_no AS txn_id,
+    grn_no AS code,
+    DATE(created_at) AS date,
+    status
+FROM grn_headers
+WHERE status IN ('Complete', 'Void')
+SQL;
+
+    public const PGSQL_GRN = <<<'SQL'
+SELECT
+    docno AS txn_id,
+    docno AS code,
+    DATE(docdt) AS date
+FROM psite_grc
+WHERE createdby = 'ZPOS'
+SQL;
+
     public const MYSQL_GRT = <<<'SQL'
 SELECT
     id AS txn_id,
@@ -101,15 +130,16 @@ SQL;
     public static function isAvailable(TransactionReconType $type): bool
     {
         return match ($type) {
-            TransactionReconType::Packet, TransactionReconType::Grt, TransactionReconType::Cash => true,
+            TransactionReconType::Packet, TransactionReconType::Grn, TransactionReconType::Grt, TransactionReconType::Cash => true,
             default => false,
         };
     }
 
-    public static function mysql(TransactionReconType $type): string
+    public static function mysql(TransactionReconType $type, bool $grnTableExists = true): string
     {
         return match ($type) {
             TransactionReconType::Packet => self::MYSQL_PACKET,
+            TransactionReconType::Grn => $grnTableExists ? self::MYSQL_GRN : self::MYSQL_GRN_HEADERS,
             TransactionReconType::Grt => self::MYSQL_GRT,
             TransactionReconType::Cash => self::MYSQL_CASH,
             default => throw new RuntimeException("Zwing query not configured for {$type->value}."),
@@ -120,6 +150,7 @@ SQL;
     {
         return match ($type) {
             TransactionReconType::Packet => self::PGSQL_PACKET,
+            TransactionReconType::Grn => self::PGSQL_GRN,
             TransactionReconType::Grt => self::PGSQL_GRT,
             TransactionReconType::Cash => self::PGSQL_CASH,
             default => throw new RuntimeException("ERP query not configured for {$type->value}."),

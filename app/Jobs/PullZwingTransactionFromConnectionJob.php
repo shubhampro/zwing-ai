@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\ExternalQueryStatus;
+use App\Enums\TransactionReconType;
 use App\Models\ExternalQueryLog;
 use App\Models\Organization;
 use App\Models\TransactionReconSession;
@@ -57,10 +58,13 @@ class PullZwingTransactionFromConnectionJob implements ShouldQueue
 
             $mysqlRuntime = $connector->openMysqlSshDatabase((string) $organization->db_name);
 
+            $grnTableExists = $session->type !== TransactionReconType::Grn
+                || $connector->hasTable($mysqlRuntime, 'grn');
+
             $puller->insertFromQuery(
                 connector: $connector,
                 runtimeName: $mysqlRuntime,
-                sql: TransactionReconciliationQueries::mysql($session->type),
+                sql: TransactionReconciliationQueries::mysql($session->type, $grnTableExists),
                 bindings: [],
                 table: 'zwing_transaction_reconsile',
                 session: $session,

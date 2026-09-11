@@ -8,6 +8,7 @@ use App\Support\DatabaseHost;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use PDO;
 use RuntimeException;
 
@@ -74,6 +75,11 @@ class OrganizationDatabaseConnector
     public function connection(string $runtimeName): Connection
     {
         return DB::connection($runtimeName);
+    }
+
+    public function hasTable(string $runtimeName, string $table): bool
+    {
+        return Schema::connection($runtimeName)->hasTable($table);
     }
 
     public function close(string $runtimeName): void

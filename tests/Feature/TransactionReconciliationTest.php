@@ -9,6 +9,8 @@ use App\Models\Organization;
 use App\Models\OrganizationDatabaseConnection;
 use App\Models\TransactionReconSession;
 use App\Models\User;
+use App\Services\OrganizationDatabaseConnector;
+use App\Services\TransactionReconciliationPuller;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -69,7 +71,8 @@ test('authenticated users can visit create page', function () {
             ->where('types.0.available', true)
             ->where('types.2.key', 'grt')
             ->where('types.2.available', true)
-            ->where('types.1.available', false)
+            ->where('types.1.key', 'grn')
+            ->where('types.1.available', true)
             ->where('types.4.key', 'cash')
             ->where('types.4.available', true));
 });
@@ -140,20 +143,51 @@ test('packet pull requires at least one side', function () {
         ->assertSessionHasErrors('include_zwing');
 });
 
-test('grn type is rejected until queries exist', function () {
+test('grn pull creates session and chains zwing then erp jobs', function () {
+    Bus::fake();
+
     $user = User::factory()->create();
     $organization = Organization::factory()->create([
-        'db_name' => 'zw_mn_1_demo',
+        'vendor_id' => 666,
+        'db_name' => 'zw_mn_666_demo',
+    ]);
+    $pgsql = OrganizationDatabaseConnection::factory()->pgsql()->create([
+        'organization_id' => $organization->id,
     ]);
 
     $this->actingAs($user)
         ->post(route('transaction-reconciliation.store'), [
+            'name' => 'Live grn pull',
             'type' => 'grn',
             'organization_id' => $organization->id,
+            'pgsql_connection_id' => $pgsql->id,
             'include_zwing' => true,
-            'include_erp' => false,
+            'include_erp' => true,
         ])
-        ->assertSessionHasErrors('type');
+        ->assertRedirect();
+
+    $session = TransactionReconSession::query()->where('user_id', $user->id)->firstOrFail();
+
+    expect($session->name)->toBe('Live grn pull')
+        ->and($session->type)->toBe(TransactionReconType::Grn)
+        ->and($session->status)->toBe('pending');
+
+    Bus::assertChained([
+        new PullZwingTransactionFromConnectionJob(
+            sessionId: $session->id,
+            externalQueryLogId: (int) ExternalQueryLog::query()
+                ->where('job_type', ExternalQueryJobType::PullTransactionZwing)
+                ->value('id'),
+            completeSession: false,
+        ),
+        new PullErpTransactionFromConnectionJob(
+            sessionId: $session->id,
+            pgsqlConnectionId: $pgsql->id,
+            externalQueryLogId: (int) ExternalQueryLog::query()
+                ->where('job_type', ExternalQueryJobType::PullTransactionErp)
+                ->value('id'),
+        ),
+    ]);
 });
 
 test('grt pull creates session and chains zwing then erp jobs', function () {
@@ -250,6 +284,56 @@ test('cash pull creates session and chains zwing then erp jobs', function () {
     ]);
 });
 
+test('zwing grn pull uses grn_headers when grn table is missing', function () {
+    $user = User::factory()->create();
+    $organization = Organization::factory()->create([
+        'vendor_id' => 12,
+        'db_name' => 'zw_mn_12_demo',
+    ]);
+    $session = TransactionReconSession::factory()->for($user)->create([
+        'type' => TransactionReconType::Grn,
+        'v_id' => $organization->vendor_id,
+        'organization_id' => $organization->id,
+        'status' => 'pending',
+    ]);
+
+    $connector = Mockery::mock(OrganizationDatabaseConnector::class);
+    $connector->shouldReceive('openMysqlSshDatabase')->once()->andReturn('runtime_mysql');
+    $connector->shouldReceive('hasTable')->once()->with('runtime_mysql', 'grn')->andReturn(false);
+    $connector->shouldReceive('eachRow')
+        ->once()
+        ->withArgs(function (string $runtime, string $sql, array $bindings, callable $callback): bool {
+            expect($runtime)->toBe('runtime_mysql')
+                ->and($sql)->toContain('FROM grn_headers')
+                ->and($sql)->not->toContain("FROM grn\n");
+
+            $callback([
+                'txn_id' => 'GRN-9',
+                'code' => 'GRN-9',
+                'date' => '2026-09-01',
+                'status' => 'Complete',
+            ]);
+
+            return true;
+        });
+    $connector->shouldReceive('close')->once()->with('runtime_mysql');
+
+    $job = new PullZwingTransactionFromConnectionJob(
+        sessionId: $session->id,
+        completeSession: true,
+    );
+
+    $job->handle($connector, app(TransactionReconciliationPuller::class));
+
+    $session->refresh();
+    $row = DB::table('zwing_transaction_reconsile')->where('session_id', $session->id)->first();
+
+    expect($session->status)->toBe('completed')
+        ->and($session->zwing_row_count)->toBe(1)
+        ->and($row?->txn_id)->toBe('GRN-9')
+        ->and($row?->txn_date)->toBe('2026-09-01');
+});
+
 test('report matches packet rows on txn id', function () {
     $user = User::factory()->create();
     $session = TransactionReconSession::factory()->for($user)->completed()->create();
@@ -308,6 +392,47 @@ test('report matches packet rows on txn id', function () {
             ->where('summary.total', 3)
             ->has('statusOptions.zwing')
             ->has('statusOptions.erp'));
+});
+
+test('report flags grn date mismatch without status mismatch', function () {
+    $user = User::factory()->create();
+    $session = TransactionReconSession::factory()->for($user)->completed()->create([
+        'type' => TransactionReconType::Grn,
+    ]);
+
+    DB::table('zwing_transaction_reconsile')->insert([
+        'session_id' => $session->id,
+        'txn_id' => 'GRN-1',
+        'code' => 'GRN-1',
+        'type' => '',
+        'status' => 'Complete',
+        'txn_date' => '2026-09-01',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('erp_transaction_reconsile')->insert([
+        'session_id' => $session->id,
+        'txn_id' => 'GRN-1',
+        'code' => 'GRN-1',
+        'type' => '',
+        'status' => '',
+        'txn_date' => '2026-09-02',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('transaction-reconciliation.report', $session))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('transaction-reconciliation/report')
+            ->where('session.uses_date_columns', true)
+            ->where('session.uses_cash_columns', false)
+            ->where('summary.date_mismatch', 1)
+            ->where('summary.status_mismatch', 0)
+            ->where('summary.matched', 0)
+            ->where('rows.0.match_status', 'date_mismatch'));
 });
 
 test('report flags cash amount mismatch', function () {

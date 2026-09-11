@@ -25,8 +25,33 @@ test('grt queries map id, docno, and status', function () {
         ->toContain('docno AS code')
         ->toContain("'POST' AS status")
         ->toContain('FROM psite_grt')
-        ->and(TransactionReconciliationQueries::isAvailable(TransactionReconType::Grt))->toBeTrue()
-        ->and(TransactionReconciliationQueries::isAvailable(TransactionReconType::Grn))->toBeFalse();
+        ->and(TransactionReconciliationQueries::isAvailable(TransactionReconType::Grt))->toBeTrue();
+});
+
+test('grn queries map doc number and date and fall back to grn_headers', function () {
+    $zwing = TransactionReconciliationQueries::mysql(TransactionReconType::Grn);
+    $zwingHeaders = TransactionReconciliationQueries::mysql(TransactionReconType::Grn, false);
+    $erp = TransactionReconciliationQueries::pgsql(TransactionReconType::Grn);
+
+    expect($zwing)
+        ->toContain('grn_no AS txn_id')
+        ->toContain('grn_no AS code')
+        ->toContain('DATE(created_at) AS date')
+        ->toContain('FROM grn')
+        ->toContain("WHERE status IN ('posted', 'void')")
+        ->not->toContain('FROM grn_headers')
+        ->and($zwingHeaders)
+        ->toContain('FROM grn_headers')
+        ->toContain('grn_no AS txn_id')
+        ->toContain("WHERE status IN ('Complete', 'Void')")
+        ->not->toContain("FROM grn\n")
+        ->and($erp)
+        ->toContain('docno AS txn_id')
+        ->toContain('docno AS code')
+        ->toContain('DATE(docdt) AS date')
+        ->toContain('FROM psite_grc')
+        ->toContain("createdby = 'ZPOS'")
+        ->and(TransactionReconciliationQueries::isAvailable(TransactionReconType::Grn))->toBeTrue();
 });
 
 test('cash queries map site, doc, date, amount, and status without date range', function () {

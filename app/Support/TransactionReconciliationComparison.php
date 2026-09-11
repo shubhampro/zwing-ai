@@ -47,7 +47,7 @@ class TransactionReconciliationComparison
                     WHEN z.type IS DISTINCT FROM e.type THEN 'type_mismatch'
                     WHEN z.amount IS NOT NULL AND e.amount IS NOT NULL AND z.amount IS DISTINCT FROM e.amount THEN 'amount_mismatch'
                     WHEN z.txn_date IS NOT NULL AND e.txn_date IS NOT NULL AND z.txn_date IS DISTINCT FROM e.txn_date THEN 'date_mismatch'
-                    WHEN z.status IS DISTINCT FROM e.status THEN 'status_mismatch'
+                    WHEN NULLIF(z.status, '') IS NOT NULL AND NULLIF(e.status, '') IS NOT NULL AND z.status IS DISTINCT FROM e.status THEN 'status_mismatch'
                     ELSE 'matched'
                 END AS match_status
             FROM (

@@ -83,6 +83,7 @@ type Props = {
         type: string;
         type_label: string;
         uses_cash_columns: boolean;
+        uses_date_columns: boolean;
     };
     summary: Summary;
     rows: ReportRow[];
@@ -265,10 +266,12 @@ function CompareValue({
 
 function ComparisonRow({
     row,
-    showCashColumns,
+    showDateColumns,
+    showAmountColumns,
 }: {
     row: ReportRow;
-    showCashColumns: boolean;
+    showDateColumns: boolean;
+    showAmountColumns: boolean;
 }) {
     const { label, variant } = statusConfig[row.match_status];
 
@@ -301,35 +304,35 @@ function ComparisonRow({
             >
                 {row.zwing_type ?? '—'}
             </td>
-            {showCashColumns && (
-                <>
-                    <td
-                        className={cn(
-                            'px-3 py-3 align-middle',
-                            ZWING_CELL,
-                            compareCellClass(
-                                row.zwing_date,
-                                row.erp_date,
-                                'zwing',
-                            ),
-                        )}
-                    >
-                        {formatDate(row.zwing_date)}
-                    </td>
-                    <td
-                        className={cn(
-                            'px-3 py-3 align-middle font-mono text-xs',
-                            ZWING_CELL,
-                            compareCellClass(
-                                amountAsString(row.zwing_amount),
-                                amountAsString(row.erp_amount),
-                                'zwing',
-                            ),
-                        )}
-                    >
-                        {formatAmount(row.zwing_amount)}
-                    </td>
-                </>
+            {showDateColumns && (
+                <td
+                    className={cn(
+                        'px-3 py-3 align-middle',
+                        ZWING_CELL,
+                        compareCellClass(
+                            row.zwing_date,
+                            row.erp_date,
+                            'zwing',
+                        ),
+                    )}
+                >
+                    {formatDate(row.zwing_date)}
+                </td>
+            )}
+            {showAmountColumns && (
+                <td
+                    className={cn(
+                        'px-3 py-3 align-middle font-mono text-xs',
+                        ZWING_CELL,
+                        compareCellClass(
+                            amountAsString(row.zwing_amount),
+                            amountAsString(row.erp_amount),
+                            'zwing',
+                        ),
+                    )}
+                >
+                    {formatAmount(row.zwing_amount)}
+                </td>
             )}
             <td
                 className={cn(
@@ -359,35 +362,31 @@ function ComparisonRow({
             >
                 {row.erp_type ?? '—'}
             </td>
-            {showCashColumns && (
-                <>
-                    <td
-                        className={cn(
-                            'px-3 py-3 align-middle',
-                            ERP_CELL,
-                            compareCellClass(
-                                row.zwing_date,
-                                row.erp_date,
-                                'erp',
-                            ),
-                        )}
-                    >
-                        {formatDate(row.erp_date)}
-                    </td>
-                    <td
-                        className={cn(
-                            'px-3 py-3 align-middle font-mono text-xs',
-                            ERP_CELL,
-                            compareCellClass(
-                                amountAsString(row.zwing_amount),
-                                amountAsString(row.erp_amount),
-                                'erp',
-                            ),
-                        )}
-                    >
-                        {formatAmount(row.erp_amount)}
-                    </td>
-                </>
+            {showDateColumns && (
+                <td
+                    className={cn(
+                        'px-3 py-3 align-middle',
+                        ERP_CELL,
+                        compareCellClass(row.zwing_date, row.erp_date, 'erp'),
+                    )}
+                >
+                    {formatDate(row.erp_date)}
+                </td>
+            )}
+            {showAmountColumns && (
+                <td
+                    className={cn(
+                        'px-3 py-3 align-middle font-mono text-xs',
+                        ERP_CELL,
+                        compareCellClass(
+                            amountAsString(row.zwing_amount),
+                            amountAsString(row.erp_amount),
+                            'erp',
+                        ),
+                    )}
+                >
+                    {formatAmount(row.erp_amount)}
+                </td>
             )}
             <td
                 className={cn(
@@ -411,6 +410,12 @@ export default function TransactionReconciliationReport({
     filters: initialFilters,
     statusOptions,
 }: Props) {
+    const showDateColumns = session.uses_date_columns;
+    const showAmountColumns = session.uses_cash_columns;
+    const sideColumnCount =
+        3 + (showDateColumns ? 1 : 0) + (showAmountColumns ? 1 : 0);
+    const tableColumnCount = 2 + sideColumnCount * 2;
+
     const [codeQuery, setCodeQuery] = useState(initialFilters.code_query);
     const [zwingStatus, setZwingStatus] = useState(
         initialFilters.zwing_status || ANY_STATUS,
@@ -558,19 +563,19 @@ export default function TransactionReconciliationReport({
                         value={summary.code_mismatch}
                         color="text-amber-600 dark:text-amber-400"
                     />
-                    {session.uses_cash_columns && (
-                        <>
-                            <SummaryCard
-                                label="Amount mismatch"
-                                value={summary.amount_mismatch}
-                                color="text-amber-600 dark:text-amber-400"
-                            />
-                            <SummaryCard
-                                label="Date mismatch"
-                                value={summary.date_mismatch}
-                                color="text-amber-600 dark:text-amber-400"
-                            />
-                        </>
+                    {showAmountColumns && (
+                        <SummaryCard
+                            label="Amount mismatch"
+                            value={summary.amount_mismatch}
+                            color="text-amber-600 dark:text-amber-400"
+                        />
+                    )}
+                    {showDateColumns && (
+                        <SummaryCard
+                            label="Date mismatch"
+                            value={summary.date_mismatch}
+                            color="text-amber-600 dark:text-amber-400"
+                        />
                     )}
                     <SummaryCard
                         label="Not in ERP"
@@ -675,8 +680,9 @@ export default function TransactionReconciliationReport({
                     {filters
                         .filter((item) => {
                             if (
-                                !session.uses_cash_columns &&
-                                (item.value === 'amount_mismatch' ||
+                                (!showAmountColumns &&
+                                    item.value === 'amount_mismatch') ||
+                                (!showDateColumns &&
                                     item.value === 'date_mismatch')
                             ) {
                                 return false;
@@ -746,17 +752,13 @@ export default function TransactionReconciliationReport({
                                         Txn id
                                     </th>
                                     <th
-                                        colSpan={
-                                            session.uses_cash_columns ? 5 : 3
-                                        }
+                                        colSpan={sideColumnCount}
                                         className={ZWING_HEAD}
                                     >
                                         Zwing
                                     </th>
                                     <th
-                                        colSpan={
-                                            session.uses_cash_columns ? 5 : 3
-                                        }
+                                        colSpan={sideColumnCount}
                                         className={ERP_HEAD}
                                     >
                                         ERP
@@ -781,25 +783,25 @@ export default function TransactionReconciliationReport({
                                             ? 'Site'
                                             : 'Type'}
                                     </th>
-                                    {session.uses_cash_columns && (
-                                        <>
-                                            <th
-                                                className={cn(
-                                                    'px-3 py-2 font-medium',
-                                                    ZWING_CELL,
-                                                )}
-                                            >
-                                                Date
-                                            </th>
-                                            <th
-                                                className={cn(
-                                                    'px-3 py-2 font-medium',
-                                                    ZWING_CELL,
-                                                )}
-                                            >
-                                                Amount
-                                            </th>
-                                        </>
+                                    {showDateColumns && (
+                                        <th
+                                            className={cn(
+                                                'px-3 py-2 font-medium',
+                                                ZWING_CELL,
+                                            )}
+                                        >
+                                            Date
+                                        </th>
+                                    )}
+                                    {showAmountColumns && (
+                                        <th
+                                            className={cn(
+                                                'px-3 py-2 font-medium',
+                                                ZWING_CELL,
+                                            )}
+                                        >
+                                            Amount
+                                        </th>
                                     )}
                                     <th
                                         className={cn(
@@ -827,25 +829,25 @@ export default function TransactionReconciliationReport({
                                             ? 'Site'
                                             : 'Type'}
                                     </th>
-                                    {session.uses_cash_columns && (
-                                        <>
-                                            <th
-                                                className={cn(
-                                                    'px-3 py-2 font-medium',
-                                                    ERP_CELL,
-                                                )}
-                                            >
-                                                Date
-                                            </th>
-                                            <th
-                                                className={cn(
-                                                    'px-3 py-2 font-medium',
-                                                    ERP_CELL,
-                                                )}
-                                            >
-                                                Amount
-                                            </th>
-                                        </>
+                                    {showDateColumns && (
+                                        <th
+                                            className={cn(
+                                                'px-3 py-2 font-medium',
+                                                ERP_CELL,
+                                            )}
+                                        >
+                                            Date
+                                        </th>
+                                    )}
+                                    {showAmountColumns && (
+                                        <th
+                                            className={cn(
+                                                'px-3 py-2 font-medium',
+                                                ERP_CELL,
+                                            )}
+                                        >
+                                            Amount
+                                        </th>
                                     )}
                                     <th
                                         className={cn(
@@ -861,11 +863,7 @@ export default function TransactionReconciliationReport({
                                 {rows.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={
-                                                session.uses_cash_columns
-                                                    ? 12
-                                                    : 8
-                                            }
+                                            colSpan={tableColumnCount}
                                             className="px-4 py-10 text-center text-sm text-muted-foreground"
                                         >
                                             No rows found for the selected
@@ -877,9 +875,8 @@ export default function TransactionReconciliationReport({
                                     <ComparisonRow
                                         key={`${row.txn_id}-${row.match_status}-${index}`}
                                         row={row}
-                                        showCashColumns={
-                                            session.uses_cash_columns
-                                        }
+                                        showDateColumns={showDateColumns}
+                                        showAmountColumns={showAmountColumns}
                                     />
                                 ))}
                             </tbody>

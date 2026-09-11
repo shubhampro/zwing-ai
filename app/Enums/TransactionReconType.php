@@ -26,6 +26,11 @@ enum TransactionReconType: string
         return $this === self::Cash;
     }
 
+    public function usesDateColumns(): bool
+    {
+        return $this === self::Cash || $this === self::Grn;
+    }
+
     /**
      * @return list<string>
      */

@@ -321,6 +321,7 @@ class TransactionReconciliationController extends Controller
                 'type' => $transactionReconSession->type->value,
                 'type_label' => $transactionReconSession->type->label(),
                 'uses_cash_columns' => $transactionReconSession->type->usesCashColumns(),
+                'uses_date_columns' => $transactionReconSession->type->usesDateColumns(),
             ],
             'summary' => [
                 'total' => (int) ($summary->total ?? 0),
