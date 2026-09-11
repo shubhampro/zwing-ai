@@ -36,6 +36,10 @@ final class Permissions
 
     public const InvoiceReconManage = 'invoice-recon.manage';
 
+    public const ReportReconView = 'report-recon.view';
+
+    public const ReportReconManage = 'report-recon.manage';
+
     public const ExpenseCashReconView = 'expense-cash-recon.view';
 
     public const ExpenseCashReconManage = 'expense-cash-recon.manage';
@@ -90,6 +94,8 @@ final class Permissions
             self::StockReconManage,
             self::InvoiceReconView,
             self::InvoiceReconManage,
+            self::ReportReconView,
+            self::ReportReconManage,
             self::ExpenseCashReconView,
             self::ExpenseCashReconManage,
             self::TransactionCheckerView,

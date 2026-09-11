@@ -42,6 +42,7 @@ import { index as externalQueryLogsIndex } from '@/routes/external-query-logs';
 import { index as inboundEventsRunnerIndex } from '@/routes/inbound-events-runner';
 import { index as invitesIndex } from '@/routes/invites';
 import { index as invoiceReconciliationIndex } from '@/routes/invoice-reconciliation';
+import { index as reportConsolidationIndex } from '@/routes/report-consolidation';
 import { index as organizationsIndex } from '@/routes/organizations';
 import { index as outboundSyncIndex } from '@/routes/outbound-sync';
 import { index as payloadComposersIndex } from '@/routes/payload-composers';
@@ -137,6 +138,12 @@ const mainNavItems: NavItem[] = [
                 href: invoiceReconciliationIndex.url(),
                 icon: FileText,
                 permission: 'invoice-recon.view',
+            },
+            {
+                title: 'Report consolidation',
+                href: reportConsolidationIndex.url(),
+                icon: FileText,
+                permission: 'report-recon.view',
             },
             {
                 title: 'Expense & cash',

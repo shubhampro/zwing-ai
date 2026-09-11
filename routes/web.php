@@ -13,6 +13,7 @@ use App\Http\Controllers\OrganizationDatabaseConnectionController;
 use App\Http\Controllers\OrganizationThirdPartyApiController;
 use App\Http\Controllers\OutboundSyncController;
 use App\Http\Controllers\PayloadComposerController;
+use App\Http\Controllers\ReportConsolidationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ServerHealthController;
 use App\Http\Controllers\SqlQueryController;
@@ -286,6 +287,28 @@ Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::delete('invoice-reconciliation/{invoiceReconSession}', [InvoiceReconciliationController::class, 'destroy'])
         ->middleware('permission:'.Permissions::InvoiceReconManage)
         ->name('invoice-reconciliation.destroy');
+
+    Route::get('report-consolidation', [ReportConsolidationController::class, 'index'])
+        ->middleware('permission:'.Permissions::ReportReconView)
+        ->name('report-consolidation.index');
+    Route::get('report-consolidation/create', [ReportConsolidationController::class, 'create'])
+        ->middleware('permission:'.Permissions::ReportReconManage)
+        ->name('report-consolidation.create');
+    Route::post('report-consolidation', [ReportConsolidationController::class, 'store'])
+        ->middleware('permission:'.Permissions::ReportReconManage)
+        ->name('report-consolidation.store');
+    Route::get('report-consolidation/{reportReconSession}', [ReportConsolidationController::class, 'show'])
+        ->middleware('permission:'.Permissions::ReportReconView)
+        ->name('report-consolidation.show');
+    Route::get('report-consolidation/{reportReconSession}/report', [ReportConsolidationController::class, 'report'])
+        ->middleware('permission:'.Permissions::ReportReconView)
+        ->name('report-consolidation.report');
+    Route::get('report-consolidation/{reportReconSession}/report/export', [ReportConsolidationController::class, 'exportReport'])
+        ->middleware('permission:'.Permissions::ReportReconView)
+        ->name('report-consolidation.report.export');
+    Route::delete('report-consolidation/{reportReconSession}', [ReportConsolidationController::class, 'destroy'])
+        ->middleware('permission:'.Permissions::ReportReconManage)
+        ->name('report-consolidation.destroy');
 
     Route::get('expense-cash-reconciliation', [ExpenseCashReconciliationController::class, 'index'])
         ->middleware('permission:'.Permissions::ExpenseCashReconView)
