@@ -19,7 +19,7 @@ class PullZwingStockFromConnectionJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 90;
+    public int $timeout = 120;
 
     public int $tries = 1;
 

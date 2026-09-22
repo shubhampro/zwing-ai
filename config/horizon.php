@@ -225,7 +225,7 @@ return [
             'maxJobs' => 0,
             'memory' => 256,
             'tries' => 1,
-            'timeout' => 90,
+            'timeout' => 120,
             'nice' => 0,
         ],
     ],
