@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\Salesforce\SalesforceCliSoqlClient;
+use App\Services\Salesforce\SalesforceSoqlClient;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(SalesforceSoqlClient::class, SalesforceCliSoqlClient::class);
     }
 
     /**

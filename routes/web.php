@@ -15,6 +15,8 @@ use App\Http\Controllers\OutboundSyncController;
 use App\Http\Controllers\PayloadComposerController;
 use App\Http\Controllers\ReportConsolidationController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SalesforceCaseController;
+use App\Http\Controllers\SalesforceMonthlySupportController;
 use App\Http\Controllers\ServerHealthController;
 use App\Http\Controllers\SqlQueryController;
 use App\Http\Controllers\StockTransactionReconciliationController;
@@ -41,6 +43,13 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('sf-mbr', [SalesforceMonthlySupportController::class, 'index'])->name('sf-mbr.index');
+    Route::get('sf-mbr/{month}', [SalesforceMonthlySupportController::class, 'show'])
+        ->where('month', '[0-9]{4}-[0-9]{2}')
+        ->name('sf-mbr.show');
+    Route::get('sf-cases', [SalesforceCaseController::class, 'index'])->name('sf-cases.index');
+    Route::get('sf-cases/{sfCase:case_number}', [SalesforceCaseController::class, 'show'])
+        ->name('sf-cases.show');
 
     Route::middleware('permission:'.Permissions::UsersManage)->group(function () {
         Route::get('users', [UserController::class, 'index'])->name('users.index');

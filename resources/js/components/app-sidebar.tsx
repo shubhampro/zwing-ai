@@ -10,6 +10,7 @@ import {
     Gauge,
     KeyRound,
     LayoutGrid,
+    List,
     Mail,
     Package,
     PlayCircle,
@@ -17,6 +18,7 @@ import {
     RefreshCw,
     Scale,
     Shield,
+    Ticket,
     Users,
     Wallet,
     WandSparkles,
@@ -37,6 +39,8 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as sfCasesIndex } from '@/routes/sf-cases';
+import { index as sfMbrIndex } from '@/routes/sf-mbr';
 import { index as expenseCashReconciliationIndex } from '@/routes/expense-cash-reconciliation';
 import { index as externalQueryLogsIndex } from '@/routes/external-query-logs';
 import { index as inboundEventsRunnerIndex } from '@/routes/inbound-events-runner';
@@ -62,6 +66,16 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Zwing MBR',
+        href: sfMbrIndex(),
+        icon: Ticket,
+    },
+    {
+        title: 'SF Cases',
+        href: sfCasesIndex(),
+        icon: List,
     },
     {
         title: 'Access',
