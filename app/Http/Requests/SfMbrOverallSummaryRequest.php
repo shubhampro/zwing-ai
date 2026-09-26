@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\SfMbrReport;
+use App\Support\Permissions;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -12,7 +13,7 @@ class SfMbrOverallSummaryRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        return $this->user()?->can(Permissions::SfMbrView) ?? false;
     }
 
     /**

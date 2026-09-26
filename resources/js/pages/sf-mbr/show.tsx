@@ -20,6 +20,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { useCan } from '@/hooks/use-can';
 import { formatDateOnly } from '@/lib/datetime';
 import { dashboard } from '@/routes';
 import { details, index, show, summary } from '@/routes/sf-mbr';
@@ -129,6 +130,7 @@ export default function SfMbrShow({
     const isActive =
         report.status === 'generating' || report.status === 'pending';
     const isReady = report.status === 'ready';
+    const canDelete = useCan()('sf-mbr.delete');
     const [confirmOpen, setConfirmOpen] = useState(false);
     const { delete: deleteReport, processing } = useForm();
 
@@ -163,15 +165,17 @@ export default function SfMbrShow({
                         <Button size="sm" variant="outline" asChild>
                             <Link href={index.url()}>Back</Link>
                         </Button>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => setConfirmOpen(true)}
-                        >
-                            <Trash2 className="size-4" />
-                            Delete
-                        </Button>
+                        {canDelete ? (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setConfirmOpen(true)}
+                            >
+                                <Trash2 className="size-4" />
+                                Delete
+                            </Button>
+                        ) : null}
                     </div>
                 </div>
 

@@ -32,6 +32,9 @@ class RolePermissionSeeder extends Seeder
         $viewer = SpatieRole::findOrCreate(Role::Viewer->value);
         $viewer->syncPermissions(Permissions::viewPermissions());
 
+        $cst = SpatieRole::findOrCreate(Role::Cst->value);
+        $cst->syncPermissions(Permissions::cstPermissions());
+
         User::query()
             ->whereDoesntHave('roles')
             ->each(fn (User $user) => $user->assignRole(Role::Admin));

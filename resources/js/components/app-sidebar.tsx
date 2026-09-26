@@ -71,11 +71,13 @@ const mainNavItems: NavItem[] = [
         title: 'MBR Report',
         href: sfMbrIndex(),
         icon: Ticket,
+        permission: 'sf-mbr.view',
     },
     {
         title: 'SF Cases',
         href: sfCasesIndex(),
         icon: List,
+        permission: 'sf-cases.view',
     },
     {
         title: 'Access',

@@ -79,6 +79,18 @@ it('cannot delete system roles', function () {
     expect(SpatieRole::query()->where('name', Role::Admin->value)->exists())->toBeTrue();
 });
 
+it('cannot delete the cst system role', function () {
+    $admin = User::factory()->admin()->create();
+    $systemRole = SpatieRole::findByName(Role::Cst->value);
+
+    actingAs($admin)
+        ->delete("/roles/{$systemRole->id}")
+        ->assertRedirect()
+        ->assertSessionHasErrors('role');
+
+    expect(SpatieRole::query()->where('name', Role::Cst->value)->exists())->toBeTrue();
+});
+
 it('cannot strip critical permissions from admin', function () {
     $admin = User::factory()->admin()->create();
     $systemRole = SpatieRole::findByName(Role::Admin->value);

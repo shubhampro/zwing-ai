@@ -54,13 +54,27 @@ it('assigns expected permission sets to roles', function () {
     $operator = User::factory()->operator()->create();
     $viewer = User::factory()->viewer()->create();
 
+    $cst = User::factory()->cst()->create();
+
     expect($admin->can(Permissions::UsersManage))->toBeTrue()
         ->and($admin->can(Permissions::OrganizationsDelete))->toBeTrue()
+        ->and($admin->can(Permissions::SfMbrManage))->toBeTrue()
+        ->and($admin->can(Permissions::SfMbrDelete))->toBeTrue()
         ->and($operator->can(Permissions::OrganizationsCreate))->toBeTrue()
+        ->and($operator->can(Permissions::SfMbrManage))->toBeTrue()
+        ->and($operator->can(Permissions::SfMbrDelete))->toBeTrue()
         ->and($operator->can(Permissions::UsersManage))->toBeFalse()
         ->and($viewer->can(Permissions::OrganizationsView))->toBeTrue()
+        ->and($viewer->can(Permissions::SfCasesView))->toBeTrue()
+        ->and($viewer->can(Permissions::SfMbrView))->toBeTrue()
+        ->and($viewer->can(Permissions::SfMbrManage))->toBeFalse()
+        ->and($viewer->can(Permissions::SfMbrDelete))->toBeFalse()
         ->and($viewer->can(Permissions::OrganizationsCreate))->toBeFalse()
-        ->and($viewer->hasRole(Role::Viewer))->toBeTrue();
+        ->and($viewer->hasRole(Role::Viewer))->toBeTrue()
+        ->and($cst->hasRole(Role::Cst))->toBeTrue()
+        ->and($cst->can(Permissions::SfMbrManage))->toBeTrue()
+        ->and($cst->can(Permissions::SfMbrDelete))->toBeTrue()
+        ->and($cst->can(Permissions::OrganizationsView))->toBeFalse();
 });
 
 it('forbids deleting organizations without permission', function () {

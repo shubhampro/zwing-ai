@@ -72,6 +72,14 @@ final class Permissions
 
     public const ServerHealthManage = 'server-health.manage';
 
+    public const SfCasesView = 'sf-cases.view';
+
+    public const SfMbrView = 'sf-mbr.view';
+
+    public const SfMbrManage = 'sf-mbr.manage';
+
+    public const SfMbrDelete = 'sf-mbr.delete';
+
     /**
      * @return list<string>
      */
@@ -112,6 +120,10 @@ final class Permissions
             self::PayloadComposersManage,
             self::ServerHealthView,
             self::ServerHealthManage,
+            self::SfCasesView,
+            self::SfMbrView,
+            self::SfMbrManage,
+            self::SfMbrDelete,
         ];
     }
 
@@ -146,6 +158,21 @@ final class Permissions
                 self::ServerHealthManage,
             ], true),
         ));
+    }
+
+    /**
+     * CST: Salesforce cases and MBR only.
+     *
+     * @return list<string>
+     */
+    public static function cstPermissions(): array
+    {
+        return [
+            self::SfCasesView,
+            self::SfMbrView,
+            self::SfMbrManage,
+            self::SfMbrDelete,
+        ];
     }
 
     /**

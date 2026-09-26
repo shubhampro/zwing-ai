@@ -13,6 +13,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { useCan } from '@/hooks/use-can';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { dashboard } from '@/routes';
 import { create, details, index, show, summary } from '@/routes/sf-mbr';
@@ -40,6 +41,9 @@ function applicationLabel(row: ReportRow): string {
 }
 
 export default function SfMbrIndex({ reports }: { reports: ReportRow[] }) {
+    const can = useCan();
+    const canManage = can('sf-mbr.manage');
+    const canDelete = can('sf-mbr.delete');
     const [pending, setPending] = useState<ReportRow | null>(null);
     const { delete: deleteReport, processing } = useForm();
 
@@ -64,12 +68,14 @@ export default function SfMbrIndex({ reports }: { reports: ReportRow[] }) {
                         description="Saved reviews by application and IST date range."
                         className="mb-0"
                     />
-                    <Button size="sm" asChild>
-                        <Link href={create.url()}>
-                            <Plus className="size-4" />
-                            New report
-                        </Link>
-                    </Button>
+                    {canManage && (
+                        <Button size="sm" asChild>
+                            <Link href={create.url()}>
+                                <Plus className="size-4" />
+                                New report
+                            </Link>
+                        </Button>
+                    )}
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-sidebar-border/70 dark:border-sidebar-border">
@@ -177,17 +183,19 @@ export default function SfMbrIndex({ reports }: { reports: ReportRow[] }) {
                                                         Details
                                                     </Link>
                                                 </Button>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="text-destructive hover:text-destructive"
-                                                    onClick={() =>
-                                                        setPending(row)
-                                                    }
-                                                    aria-label={`Delete ${row.title}`}
-                                                >
-                                                    <Trash2 className="size-4" />
-                                                </Button>
+                                                {canDelete && (
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() =>
+                                                            setPending(row)
+                                                        }
+                                                        aria-label={`Delete ${row.title}`}
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

@@ -1,7 +1,9 @@
-import { Head, Link, router, setLayoutProps, usePoll } from '@inertiajs/react';
-import { ListFilter, LoaderCircle } from 'lucide-react';
+import { Head, Link, router, setLayoutProps, useForm, usePoll } from '@inertiajs/react';
+import { ListFilter, LoaderCircle, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { destroy } from '@/actions/App/Http/Controllers/SfMbrReportController';
 import Heading from '@/components/heading';
+import { useCan } from '@/hooks/use-can';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -126,6 +128,10 @@ export default function SfMbrSummary({
         { autoStart: isActive },
     );
 
+    const can = useCan();
+    const canDelete = can('sf-mbr.delete');
+    const { delete: deleteReport, processing } = useForm();
+    const [confirmOpen, setConfirmOpen] = useState(false);
     const [open, setOpen] = useState(false);
     const [applicationIds, setApplicationIds] = useState(
         filters.application_ids,
@@ -204,6 +210,12 @@ export default function SfMbrSummary({
         setOpen(false);
     }
 
+    function confirmDelete() {
+        deleteReport(destroy.url(report.id), {
+            onSuccess: () => setConfirmOpen(false),
+        });
+    }
+
     function resetAll() {
         setApplicationIds(
             filter_options.applications.map((application) => application.id),
@@ -246,6 +258,17 @@ export default function SfMbrSummary({
                                         Active
                                     </Badge>
                                 ) : null}
+                            </Button>
+                        ) : null}
+                        {canDelete ? (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setConfirmOpen(true)}
+                            >
+                                <Trash2 className="size-4" />
+                                Delete
                             </Button>
                         ) : null}
                         <Button size="sm" variant="outline" asChild>
@@ -297,6 +320,38 @@ export default function SfMbrSummary({
                     </div>
                 ) : null}
             </div>
+
+            <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete MBR report?</DialogTitle>
+                        <DialogDescription>
+                            This will permanently delete{' '}
+                            <span className="font-medium text-foreground">
+                                "{report.title}"
+                            </span>{' '}
+                            and its segregated account rows. This action cannot
+                            be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setConfirmOpen(false)}
+                            disabled={processing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDelete}
+                            disabled={processing}
+                        >
+                            {processing ? 'Deleting…' : 'Delete'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={open} onOpenChange={closeFilters}>
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">

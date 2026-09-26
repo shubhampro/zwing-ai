@@ -45,16 +45,27 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware(['auth', 'verified', 'two-factor'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
-    Route::get('sf-mbr', [SfMbrReportController::class, 'index'])->name('sf-mbr.index');
-    Route::get('sf-mbr/create', [SfMbrReportController::class, 'create'])->name('sf-mbr.create');
-    Route::post('sf-mbr', [SfMbrReportController::class, 'store'])->name('sf-mbr.store');
-    Route::get('sf-mbr/{sfMbrReport}', [SfMbrReportController::class, 'show'])->name('sf-mbr.show');
-    Route::get('sf-mbr/{sfMbrReport}/summary', [SfMbrOverallSummaryController::class, 'show'])->name('sf-mbr.summary');
-    Route::get('sf-mbr/{sfMbrReport}/details', [SfMbrDetailsController::class, 'show'])->name('sf-mbr.details');
-    Route::delete('sf-mbr/{sfMbrReport}', [SfMbrReportController::class, 'destroy'])->name('sf-mbr.destroy');
-    Route::get('sf-cases', [SalesforceCaseController::class, 'index'])->name('sf-cases.index');
-    Route::get('sf-cases/{sfCase:case_number}', [SalesforceCaseController::class, 'show'])
-        ->name('sf-cases.show');
+
+    Route::get('sf-mbr', [SfMbrReportController::class, 'index'])
+        ->middleware('permission:'.Permissions::SfMbrView)
+        ->name('sf-mbr.index');
+    Route::middleware('permission:'.Permissions::SfMbrManage)->group(function () {
+        Route::get('sf-mbr/create', [SfMbrReportController::class, 'create'])->name('sf-mbr.create');
+        Route::post('sf-mbr', [SfMbrReportController::class, 'store'])->name('sf-mbr.store');
+    });
+    Route::middleware('permission:'.Permissions::SfMbrView)->group(function () {
+        Route::get('sf-mbr/{sfMbrReport}', [SfMbrReportController::class, 'show'])->name('sf-mbr.show');
+        Route::get('sf-mbr/{sfMbrReport}/summary', [SfMbrOverallSummaryController::class, 'show'])->name('sf-mbr.summary');
+        Route::get('sf-mbr/{sfMbrReport}/details', [SfMbrDetailsController::class, 'show'])->name('sf-mbr.details');
+    });
+    Route::delete('sf-mbr/{sfMbrReport}', [SfMbrReportController::class, 'destroy'])
+        ->middleware('permission:'.Permissions::SfMbrDelete)
+        ->name('sf-mbr.destroy');
+    Route::middleware('permission:'.Permissions::SfCasesView)->group(function () {
+        Route::get('sf-cases', [SalesforceCaseController::class, 'index'])->name('sf-cases.index');
+        Route::get('sf-cases/{sfCase:case_number}', [SalesforceCaseController::class, 'show'])
+            ->name('sf-cases.show');
+    });
 
     Route::middleware('permission:'.Permissions::UsersManage)->group(function () {
         Route::get('users', [UserController::class, 'index'])->name('users.index');

@@ -93,4 +93,11 @@ class UserFactory extends Factory
             $user->syncRoles([Role::Viewer]);
         });
     }
+
+    public function cst(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $user->syncRoles([Role::Cst]);
+        });
+    }
 }
