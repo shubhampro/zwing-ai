@@ -2,6 +2,7 @@
 
 namespace App\Services\Salesforce;
 
+use App\Models\SfCase;
 use App\Models\SfCaseActivity;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -13,6 +14,32 @@ class SalesforceCaseActivityPuller
     public const PERSIST_CHUNK_SIZE = 500;
 
     public function __construct(private SalesforceSoqlClient $client) {}
+
+    public function pull(bool $dryRun = false): int
+    {
+        $caseIdsBySfId = SfCase::query()->pluck('id', 'sf_id');
+
+        if ($caseIdsBySfId->isEmpty()) {
+            return 0;
+        }
+
+        $count = 0;
+
+        foreach ($caseIdsBySfId->chunk(self::CASE_ID_CHUNK_SIZE) as $chunk) {
+            $rows = $this->fetchChunk($chunk);
+            $count += count($rows);
+
+            if ($dryRun || $rows === []) {
+                continue;
+            }
+
+            foreach (array_chunk($rows, self::PERSIST_CHUNK_SIZE) as $persistChunk) {
+                $this->persistChunk($persistChunk);
+            }
+        }
+
+        return $count;
+    }
 
     /**
      * @param  Collection<string, int|string>  $caseIdsBySfId

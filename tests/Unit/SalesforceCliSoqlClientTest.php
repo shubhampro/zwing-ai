@@ -41,6 +41,40 @@ it('fails when salesforce cli exits with an error', function () {
     app(SalesforceCliSoqlClient::class)->query('SELECT Id FROM Account');
 })->throws(SalesforceQueryException::class, 'Salesforce query failed: No authorization information found');
 
+it('parses successful salesforce cli describe payload', function () {
+    Process::fake([
+        '*' => Process::result(json_encode([
+            'status' => 0,
+            'result' => [
+                'name' => 'Case',
+                'fields' => [
+                    ['name' => 'Product__c', 'picklistValues' => [['value' => 'Zwing']]],
+                ],
+            ],
+        ])),
+    ]);
+
+    $describe = app(SalesforceCliSoqlClient::class)->describe('Case');
+
+    expect($describe['name'])->toBe('Case')
+        ->and($describe['fields'][0]['name'])->toBe('Product__c');
+});
+
+it('fails when salesforce describe exits with an error', function () {
+    Process::fake([
+        '*' => Process::result(
+            output: json_encode([
+                'status' => 1,
+                'message' => 'No authorization information found',
+            ]),
+            errorOutput: '',
+            exitCode: 1,
+        ),
+    ]);
+
+    app(SalesforceCliSoqlClient::class)->describe('Case');
+})->throws(SalesforceQueryException::class, 'Salesforce describe failed: No authorization information found');
+
 it('fails when salesforce cli returns incomplete results', function () {
     Process::fake([
         '*' => Process::result(json_encode([

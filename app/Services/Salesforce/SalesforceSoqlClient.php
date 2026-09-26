@@ -8,4 +8,9 @@ interface SalesforceSoqlClient
      * @return list<array<string, mixed>>
      */
     public function query(string $soql): array;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function describe(string $sobject): array;
 }

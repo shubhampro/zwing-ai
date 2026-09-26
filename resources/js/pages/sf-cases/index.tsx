@@ -16,7 +16,10 @@ import {
 import { formatDateTime } from '@/lib/datetime';
 import { dashboard } from '@/routes';
 import { index, show } from '@/routes/sf-cases';
-import { formatNumber } from '../sf-mbr/format';
+
+function formatNumber(value: number): string {
+    return new Intl.NumberFormat('en-IN').format(value);
+}
 
 type CaseRow = {
     id: number;

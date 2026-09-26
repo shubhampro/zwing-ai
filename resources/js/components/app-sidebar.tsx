@@ -68,7 +68,7 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
-        title: 'Zwing MBR',
+        title: 'MBR Report',
         href: sfMbrIndex(),
         icon: Ticket,
     },

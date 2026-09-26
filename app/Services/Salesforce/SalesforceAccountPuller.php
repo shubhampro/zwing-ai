@@ -7,9 +7,9 @@ use Illuminate\Support\Carbon;
 
 class SalesforceAccountPuller
 {
-    private const CHUNK_SIZE = 500;
+    public const ACCOUNT_SOQL = 'SELECT Id, Name, LastModifiedDate FROM Account WHERE Id IN (SELECT AccountId FROM Case WHERE AccountId != null) ORDER BY Id';
 
-    private const ACCOUNT_SOQL = 'SELECT Id, Name, LastModifiedDate FROM Account ORDER BY Id';
+    private const CHUNK_SIZE = 500;
 
     public function __construct(private SalesforceSoqlClient $client) {}
 

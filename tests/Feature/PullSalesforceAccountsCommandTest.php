@@ -2,13 +2,21 @@
 
 use App\Exceptions\SalesforceQueryException;
 use App\Models\SfAccount;
+use App\Services\Salesforce\SalesforceAccountPuller;
 use App\Services\Salesforce\SalesforceSoqlClient;
 
-test('artisan command pulls all salesforce accounts', function () {
+test('account pull soql has no created-date cap', function () {
+    expect(SalesforceAccountPuller::ACCOUNT_SOQL)
+        ->toContain('FROM Account')
+        ->toContain('AccountId != null')
+        ->not->toContain('CreatedDate');
+});
+
+test('artisan command pulls accounts referenced by any case', function () {
     $this->mock(SalesforceSoqlClient::class, function ($mock) {
         $mock->shouldReceive('query')
             ->once()
-            ->with('SELECT Id, Name, LastModifiedDate FROM Account ORDER BY Id')
+            ->with(SalesforceAccountPuller::ACCOUNT_SOQL)
             ->andReturn([
                 [
                     'Id' => '001xx000000AcmeAAA',

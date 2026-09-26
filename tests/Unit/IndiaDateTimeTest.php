@@ -24,3 +24,11 @@ it('returns null for empty dates', function () {
     expect(IndiaDateTime::format(null))->toBeNull()
         ->and(IndiaDateTime::date(null))->toBeNull();
 });
+
+it('converts inclusive ist days to utc bounds', function () {
+    $start = IndiaDateTime::utcInclusiveStart('2026-03-01');
+    $end = IndiaDateTime::utcExclusiveEnd('2026-03-31');
+
+    expect($start->toDateTimeString())->toBe('2026-02-28 18:30:00')
+        ->and($end->toDateTimeString())->toBe('2026-03-31 18:30:00');
+});

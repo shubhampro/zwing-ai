@@ -9,7 +9,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 #[Signature('sf:pull-accounts {--dry-run : Query Salesforce without writing}')]
-#[Description('Pull all Salesforce accounts into the local database')]
+#[Description('Pull Salesforce accounts referenced by any Case')]
 class PullSalesforceAccountsCommand extends Command
 {
     public function handle(SalesforceAccountPuller $puller): int
